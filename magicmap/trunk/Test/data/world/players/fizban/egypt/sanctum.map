@@ -1,0 +1,7 @@
+room: /players/fizban/egypt/sanctum
+name: Inner Sanctum
+page: 25
+map: [460 600 440 600 440 650 490 650 490 600 470 600] mazeroom
+	% XXX 	630 -10 610 { dup 455 exch 1.5 dotmark 475 exch 1.2 dotmark } for
+	450 640 30 10 box
+	460 644 10 4 0 shadebox

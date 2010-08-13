@@ -1,0 +1,5 @@
+Developer Notes:
+
+==Building a Release==
+
+At the project root, do "make dist" to create a source distribution.

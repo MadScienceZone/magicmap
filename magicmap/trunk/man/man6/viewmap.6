@@ -1,0 +1,156 @@
+.TH VIEWMAP 6 "Magic Mapper" "Ragnarok MUD"
+'\"
+'\" RAGNAROK MAGIC MAPPER DOCUMENTATION:
+'\" $Header$
+'\"
+.\" Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+.\" All Rights Reserved.  Licensed under the Open Software License
+.\" version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
+'\" for details.
+'\"
+'\" Based on earlier code from the Ragnarok MudShell (MSH) client,
+'\" Copyright (c) 1993, 2000, 2001, 2002, 2003 by Steven L. Willoughby,
+'\" Aloha, Oregon, USA.  All Rights Reserved.  MSH is licensed under
+'\" the terms of the GNU General Public License (GPL) version 2.
+'\"
+'\" This product is provided for educational, experimental or personal
+'\" interest use, in accordance with the terms and conditions of the
+'\" aforementioned license agreement, ON AN "AS IS" BASIS AND WITHOUT
+'\" WARRANTY, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION,
+'\" THE WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A
+'\" PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY OF THE ORIGINAL
+'\" WORK IS WITH YOU.  (See the license agreement for full details,
+'\" including disclaimer of warranty and limitation of liability.)
+'\"
+'\" Under no curcumstances is this product intended to be used where the
+'\" safety of any person, animal, or property depends upon, or is at
+'\" risk of any kind from, the correct operation of this software.
+'\"
+.SH NAME
+viewmap \- Preview Magic Map source files
+.SH SYNOPSIS
+.B viewmap
+.RB [ \-gir ]
+.RB [ \-p
+.IR pattern ]
+.IR mapfiles ...
+.LP
+.B "viewmap --help"
+.LP
+.B "viewmap --version"
+.SH DESCRIPTION
+.LP
+When composing magic map files, a Ragnarok wizard may wish to preview the
+map (entirely or by specific room) by loading the individual map source
+file(s) into the
+.B viewmap
+program.
+.LP
+This will render the map on-screen just like the
+.BR magicmapper (6)
+program does, but it reads the
+.I source
+(a.k.a. \*(lq.map\*(rq) files directly, rather than the pre-processed
+form that is served to the player client programs such as
+.BR magicmapper .
+.SH OPTIONS
+.LP
+The following options may be specified at the command-line to control the
+operation of the program.  In cases where a short form of the option
+is provided (e.g., 
+.RB \*(lq \-v ,\*(rq)
+it may be combined with other short options in a single argument (i.e.,
+either
+.RB \*(lq \-vi \*(rq
+or
+.RB \*(lq \-v
+.BR \-i \*(rq
+are equivalent), and any value which is supposed to be given for the
+option follows it as a separate argument
+.RB (\*(lq \-p
+.IR pattern \*(rq)
+or as the remaining text after the option
+.RB (\*(lq \-p\fIpattern\fP \*(rq).
+In the case of long option names, they must be given separately from 
+each other, although values may be given as, for example,
+.RB \*(lq \-\-pattern=\fIpattern\fP \*(rq
+or
+.RB \*(lq \-\-pattern
+.IR pattern \*(rq.
+.TP
+.BR \-g " / " \-\-expand\-globs
+Any wildcard patterns in the
+.I mapfiles
+specified on the command line are expanded in the usual fashion for the
+operating system.  You probably won't need this on Unix*/Linux*
+or Macintosh* OSX* systems, since this expansion happens automatically
+by the shell, except in some special circumstances, but you would
+probably need this on Microsoft* Windows* systems.  Generally this means that:
+.RS
+.TP
+.B *
+matches any sequence of zero or more characters,
+.TP
+.B ?
+matches a single character, and
+.TP
+.BI [ abc ]
+matches a single character which may be 
+.BR a ,
+.BR b ,
+or
+.BR c .
+.RE
+.TP
+.BR \-h " / " \-\-help
+Print a summary of these options and exit.
+.TP
+.BR \-i " / " \-\-ignore\-errors
+Normally, any
+.I mapfile
+which contains an error (as in, a problem with the legality of the map file
+contents, not simply that it does not appear as intended) will halt the
+process with an error message.  With this option,
+.B viewmap
+will continue and make its best effort to render the rest of the map data
+anyway, and display what it can.
+.TP
+.BI "\-p " pattern " \fR/\fP \-\-pattern=" pattern
+When recursing (via the
+.B \-r
+option), only read files matching the shell wildcard
+.I pattern
+specified here.  This is 
+.RB \*(lq *.map \*(rq
+by default.
+.TP
+.BR \-r " / " \-\-recursive
+Recurse into each directory named in the
+.I mapfile
+list, looking for and processing every file found which matches the
+pattern
+.RB \*(lq *.map \*(rq
+(unless changed by the
+.B \-p
+option).
+.TP
+.B \-\-version
+Print the program's version number and exit.
+.SH "SEE ALSO"
+.LP
+.BR magicmap (5),
+.BR magicmapper (6).
+.SH VERSION
+.LP
+This document describes version 6 (V6) of the Ragnarok Magic Map system.  The
+version numbers of the various public tools are kept in sync with this major
+revision number.  The tool version referenced here is 6.0.
+.SH HISTORY
+.LP
+The
+.B viewmap
+command first appeared in version 6.0.
+.SH NOTES
+.LP
+*Names of third-party products are the property of, and may be trademarks or registered
+trademarks belonging to, their respective owners.

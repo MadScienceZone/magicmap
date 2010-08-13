@@ -1,0 +1,156 @@
+%
+% Ragnarok Magic Map PostScript Preamble by Fizban (from an earlier idea
+% by Klive)  $Revision: 1.11 $ $Date: 2002/11/14 08:51:56 $
+%
+2 setlinecap 0 setlinejoin 4 setmiterlimit /lw {setlinewidth} def
+/ct {curveto} def /ln {lineto} def /mv {moveto} def /sg {setgray} def
+/rln {rlineto} def /rmv {rmoveto} def
+/sd {setdash} def /bk {0 sg} def /gr {.5 sg} def /wh {1 sg} def
+/np {newpath} def /cp {closepath} def /fi {cp fill} def /a  {gsave} def
+/z  {grestore} def /xl {translate} def /Pbuf 2 string def
+/txtf {/Helvetica-Bold findfont 8 scalefont setfont} def
+/rmnf {/Helvetica findfont 6 scalefont setfont} def
+/it {/Times-Italic findfont exch scalefont setfont} def
+/ss {/Helvetica findfont exch scalefont setfont} def
+/bf {/Helvetica-Bold findfont exch scalefont setfont} def
+/tt {/Courier-Bold findfont exch scalefont setfont} def
+/sl {/Helvetica-Oblique findfont exch scalefont setfont} def
+/std {50 20} def /stdr {30} def /proto {/Xrp true def} def
+/outdoor {/Xro true def} def
+/dark {/Xrd .9 def} def
+/shaded {/Xrd exch def} def
+/offpage {/Xpq true def} def
+/in {/Xpi true def} def
+/out {/Xpo true def} def
+/special {[3 2] 4 sd} def
+/locked {/Xpl true def} def
+/roomFileName () def 
+/Xro {false} def /Xrp {false} def /Xrd {1} def /Xpq {false} def
+/Xpi {false} def /Xpo {false} def /Xpl {false} def
+/bx { /XbH exch def /XbW exch def np mv 0 XbH rlineto XbW 0 rlineto 
+0 XbH neg rlineto cp } def
+/box      { bx stroke } def
+/shadebox { /XXXpct exch def bx XXXpct sg fill bk } def
+/room {/Xrpl 20 def /XrH exch def /XrW exch def /XrY exch def /XrX exch def
+XrX XrY XrW XrH Xrd shadebox Xro {2 lw gr} {1 lw bk} ifelse 
+Xrp {[4 2] 0 sd} if XrX XrY XrW XrH box 1 lw bk []0 sd txtf
+dup length 0 gt {XrX 6 add XrY 2 add mv show XrX 6 add XrY 12 add mv show
+} { pop XrX 6 add XrY 7 add mv show } ifelse
+/XrW2 { XrW 2 div } def /XrH2 { XrH 2 div } def
+/north {XrW2 XrX add dup XrY XrH add exch XrY 
+XrH add Xrpl add XrW2 XrX add 720} def
+/south {XrW2 XrX add dup XrY exch XrY Xrpl sub XrW2 XrX add 0} def
+/east {XrX XrW add XrY XrH2 add dup XrX XrW 
+add Xrpl add exch 612 XrY XrH2 add} def
+/west {XrX XrH2 XrY add XrX Xrpl sub XrH2 XrY add 0 XrH2 XrY add} def
+/northeast{XrX XrW add XrY XrH add XrX XrW add Xrpl add 
+XrY XrH add Xrpl add 2 copy } def
+/northwest{XrX XrY XrH add XrX Xrpl sub XrY XrH add Xrpl add 2 copy} def
+/southeast{XrX XrW add XrY XrX XrW add Xrpl add XrY Xrpl sub 2 copy} def
+/southwest{XrX XrY XrX Xrpl sub XrY Xrpl sub 2 copy} def clrm 
+roomFileName length 0 gt { rmnf XrX XrY 6 sub mv roomFileName show txtf } if
+/roomFileName () def } def
+/passageLength { /Xrpl exch def } def
+/round-room {/Xrpl 20 def /XrR exch def /XrY exch def /XrX exch def
+np XrX XrY XrR 0 360 Xrd sg arc fill
+Xro {2 lw gr} {1 lw bk} ifelse Xrp {[4 2] 0 sd} if
+XrX XrY XrR 0 360 arc stroke 1 lw bk []0 sd txtf
+dup length 0 gt {XrX 15 sub XrY 6 sub mv show XrX 15 sub XrY 4 add mv show
+} { pop XrX 15 sub XrY 3 sub mv show } ifelse
+/north {XrX XrY XrR add 2 copy Xrpl add XrX 720} def
+/south {XrX XrY XrR sub 2 copy Xrpl sub XrX 0 } def
+/east  {XrX XrR add dup XrY exch Xrpl add XrY 612 XrY } def
+/west  {XrX XrR sub dup XrY exch Xrpl sub XrY 0 XrY } def
+/XrA {.7070 XrR mul} def 
+/northeast { XrX XrA add XrY XrA add XrX XrR add Xrpl add XrY XrR add Xrpl add 
+2 copy} def
+/northwest { XrX XrA sub XrY XrA add XrX XrR sub Xrpl sub XrY XrR add Xrpl add 
+2 copy} def
+/southeast { XrX XrA add XrY XrA sub XrX XrR add Xrpl add XrY XrR sub Xrpl sub 
+2 copy} def
+/southwest { XrX XrA sub XrY XrA sub XrX XrR sub Xrpl sub XrY XrR sub Xrpl sub 
+2 copy} def clrm 
+roomFileName length 0 gt { rmnf XrX 20 sub XrY 20 sub mv roomFileName show txtf } if
+/roomFileName () def } def
+/clrm { /Xro {false} def /Xrp {false} def /Xrd {1} def } def
+/arrow { /Ay2 exch def /Ax2 exch def /Ay1 exch def /Ax1 exch def
+/dy Ay2 Ay1 sub def /dx Ax2 Ax1 sub def
+/Al dx dx mul dy dy mul add sqrt def /An dy dx atan def
+/Ab Al 10 sub def a Ax1 Ay1 translate An rotate
+np 0 -.5 mv Ab -.5 ln Ab -2 ln Al 0 ln Ab 2 ln Ab .5 ln 0 .5 ln fi z } def
+/passage { Xpq {4 2 roll} if pop pop bk Xpi { 4 2 roll } if 
+Xpi Xpo or { arrow } { np 4 2 roll mv ln stroke } ifelse
+[]0 sd /Xpq {false} def /Xpi {false} def /Xpo {false} def /Xrpl 20 def } def
+/door { pop pop pop pop /XpY exch 4 sub def /XpX exch 4 sub def
+XpX XpY 8 8 1 shadebox bk XpX XpY 8 8 box
+Xpl {XpX 4 add XpY 4 add 1.5 0 360 arc fill} if /Xpl {false} def } def
+%
+% the following still needs to be optimized
+%
+/tree_outline1 { newpath 20 22 7 350 120 arc 12 25 6 40 180 arc
+6 19 4 60 210 arc 12 12 8 150 270 arc 16 6 3 180 10 arc 23 10 5 220 60 arc
+29 17 4 250 90 arc closepath } def
+/tree1 { .7 setgray .5 .5 scale tree_outline1 fill 0 setgray tree_outline1
+stroke newpath 20 13 3 200 40 arc stroke newpath 15 18 3 60 240 arc
+stroke 2 2 scale } def
+/tree2 { 90 rotate tree1 -90 rotate } def
+/clump1 { 12 12 translate tree1 -12 -12 translate
+0 12 translate tree1 0 -12 translate 12 0 translate tree1 -12 0 translate } def
+/clump2 { -15 -5 translate tree2 15 5 translate
+0 12 translate tree2 0 -12 translate 14 2 translate tree2 -14 -2 translate } def
+/boxnum { newpath moveto 20 0 rlineto 0 20 rlineto
+-20 0 rlineto closepath stroke 5 10 translate show } def
+/Tree1 { a translate tree1 z } def
+/Tree2 { a translate tree2 z } def
+/Clump1 { a translate clump1 z } def
+/Clump2 { a translate clump2 z } def
+/Boxnum { a translate boxnum z } def
+% w h bps Sx Sy x y DrawImage hexdata(w*h*bps bits of greyscale)
+/DrawImage { gsave translate scale 3 copy mul mul 8 div ceiling cvi 
+/_DI_buffer exch string def 3 copy pop dup neg 0 3 -1 roll 4 -1 roll 
+0 0 6 -3 roll 6 array astore {currentfile _DI_buffer readhexstring pop} 
+image grestore } def
+% w h bps Sx Sy x y DrawColorImage hexdata(w*h*bps bits*3 (r,g,b))
+/DrawColorImage { gsave translate scale 3 copy mul mul 3 mul 8 div ceiling 
+cvi /_DI_buffer exch string def 3 copy pop dup neg 0 3 -1 roll 4 -1 roll 
+0 0 6 -3 roll 6 array astore {currentfile _DI_buffer readhexstring pop}
+false 3 colorimage grestore } def
+/color { setrgbcolor } def
+/colorbox { color bx fill bk } def
+%
+%
+/mazearea { aload length 2 div 1 sub cvi 3 1 roll np mv {ln} repeat cp Xrd 
+sg fill bk clrm } def /mazewall { aload length 2 div 1 sub cvi 3 1 roll
+np mv {ln} repeat Xro {2 lw gr} {1 lw bk} ifelse Xrp {[4 2] 0 sd} if
+stroke clrm } def /mazeroom { dup /XXrp Xrp def /XXro Xro def /XXrd Xrd def 
+mazearea /Xrp XXrp def /Xro XXro def /Xrd XXrd def mazewall } def
+/dotmark { np 0 360 arc fill } def
+%
+% Graph paper
+%
+/MM_PortGrid { gsave 0 0 1 setrgbcolor [3 2] 4 setdash newpath
+30 30 moveto 30 700 lineto 580 700 lineto 580 30 lineto closepath stroke
+grestore gsave 35 5 575 { dup 30 mod 0 eq { .6 setgray .6 setlinewidth
+} { .8 setgray .25 setlinewidth } ifelse newpath dup 30 moveto 700 lineto
+stroke } for 35 5 695 { dup 30 mod 0 eq { .6 setgray .6 setlinewidth } {
+.8 setgray .25 setlinewidth } ifelse newpath dup 30 exch moveto 580 exch lineto
+stroke } for grestore gsave .8 0 0 setrgbcolor /Helvetica findfont 10 
+scalefont setfont 30 30 560 { dup dup 702 moveto 4 string cvs show
+dup 30 moveto 4 string cvs show } for 0 .8 0 setrgbcolor 30 30 710 {
+dup dup 30 exch moveto 4 string cvs show dup 570 exch moveto 4 string cvs show
+} for grestore bk } def
+/MM_LandGrid { gsave gsave 0 0 1 setrgbcolor [3 2] 4 setdash newpath
+30 30 moveto 30 580 lineto 700 580 lineto 700 30 lineto closepath
+stroke grestore gsave 35 5 695 { dup 30 mod 0 eq { .6 setgray
+.6 setlinewidth } { .8 setgray .25 setlinewidth } ifelse newpath
+dup 30 moveto 580 lineto stroke } for 35 5 575 { dup 30 mod 0 eq {
+.6 setgray .6 setlinewidth } { .8 setgray .25 setlinewidth } ifelse
+newpath dup 30 exch moveto 700 exch lineto stroke } for grestore
+gsave .8 0 0 setrgbcolor /Helvetica findfont 10 scalefont setfont
+30 30 680 { dup dup 32 moveto 4 string cvs show dup 570 moveto
+4 string cvs show } for 0 .8 0 setrgbcolor 30 30 580 { dup dup 5 exch moveto
+4 string cvs show dup 690 exch moveto 4 string cvs show } for bk grestore
+grestore } def
+%
+% End preamble.
+%

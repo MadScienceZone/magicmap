@@ -1,0 +1,6 @@
+room:   /players/fizban/china/maze-I/1
+name:   Han Citadel, Maze Level I
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page: 173
+map:    [380 450 360 450 360 470 ] mazewall
+       370 460 2 dotmark

@@ -1,0 +1,12 @@
+room:   /players/fizban/china/xiangqi/xq65
+name:   Xiangqi Level
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page: 171
+map:    np 1 0 0 color 3 lw 270 340 mv 60   0 rln stroke
+       np                  300 340 mv  0 -30 rln stroke
+       np 0 0 0 color 1 lw 270 370 mv 
+       	280 370 10 180 360 arc 300 370 10 180 360 arc 320 370 10 180 360 arc stroke
+       np 0 0 0 color 1 lw 270 360 mv 
+       	280 360 10 180 360 arc 300 360 10 180 360 arc 320 360 10 180 360 arc stroke
+bg: 270 310 60 60 .7529 .9137 .3803 colorbox
+    270 350 60 20 .2980 .3686 .8627 colorbox

@@ -1,0 +1,9 @@
+room: /players/fizban/egypt/maze49
+name: Maze
+page: 25
+map: [350 520 350 510 340 510 340 470 350 470 350 480 360 490 360 510]
+	dark mazearea
+	[350 520 350 510 340 510 340 470 350 470 350 490] mazewall
+	[360 490 360 500 350 500 360 500 360 510] mazewall
+	347 495 1.5 dotmark
+	()()340 490 0 10 room east locked door

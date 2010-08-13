@@ -1,0 +1,68 @@
+% Ragnarok Magic Map Title Blocks
+/NewPage {
+    ()               15  1  30 760 380 20 ZZbox
+	(PRINTED)        10 .9 410 760 110 20 ZZbox
+	(REALM CREATOR)  10 .9  30 740 490 20 ZZbox
+    (PAGE)           30  1 520 760  60 40 ZZrbox
+	(REALM)          10  1  30 720 550 20 ZZbox
+
+	bk txtf
+	LSMODE { a -90 rotate -720 0 translate } if 
+} def
+/LSMODE false def
+/LandscapeMap { /LSMODE true def } def
+/EndPage { LSMODE { z /LSMODE false def } if showpage } def
+
+%
+% A B sz color x y w h stbox - B A 
+%
+/ZZstbox {
+        /ZZboxHeight exch def
+        /ZZboxWidth  exch def
+        /ZZboxY      exch def
+        /ZZboxX      exch def
+
+        setgray
+        .5 setlinewidth
+        newpath
+                ZZboxX ZZboxY moveto
+                0 ZZboxHeight neg rlineto
+                ZZboxWidth 0 rlineto
+                0 ZZboxHeight rlineto
+        closepath fill
+        0 setgray
+        newpath
+                ZZboxX ZZboxY moveto  
+                0 ZZboxHeight neg rlineto
+                ZZboxWidth 0 rlineto  
+                0 ZZboxHeight rlineto 
+        closepath stroke
+		/Helvetica findfont exch scalefont setfont
+        exch
+} def
+
+%
+% text title color x y w h box -
+% 
+/ZZbox {
+        ZZstbox
+        ZZboxX 10 add ZZboxY ZZboxHeight sub 3 add moveto
+        show
+        ZZboxX 2 add ZZboxY 1 6 add sub moveto
+        /Helvetica findfont 6 scalefont setfont show
+} def
+%
+% text title color x y w h rbox -                     for right-justified text
+%
+/ZZrbox {
+        ZZstbox
+        dup stringwidth pop ZZboxWidth ZZboxX add exch sub 3 sub ZZboxY ZZboxHeight sub
+                5 add moveto
+        show
+        ZZboxX 2 add ZZboxY 1 6 add sub moveto
+        /Helvetica findfont 6 scalefont setfont show
+} def
+
+
+%%EndProlog
+

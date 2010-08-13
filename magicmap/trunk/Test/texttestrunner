@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+# vi:set ai sm nu ts=4 sw=4 expandtab:
+#
+import sys, unittest
+sys.path.append('../lib')
+import Test
+unittest.TextTestRunner().run(Test.suite())

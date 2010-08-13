@@ -1,0 +1,6 @@
+room:   /players/fizban/china/maze-I/elevator
+name:   Han Citadel, Maze Level I, Elevator
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page: 173
+map:    [140 550 180 550 180 530 140 530 140 550] mazeroom
+       txtf 145 535 mv (\(Up\)) show

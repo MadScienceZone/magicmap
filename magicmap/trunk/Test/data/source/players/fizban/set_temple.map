@@ -1,0 +1,5 @@
+room: /players/fizban/egypt/set_temple
+name: Temple of Set
+page: 25
+map: [440 480 450 480 450 500 480 500 480 450 450 450 450 470 440 470] mazeroom
+	460 465 10 20 0 shadebox

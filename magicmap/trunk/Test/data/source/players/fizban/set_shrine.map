@@ -1,0 +1,5 @@
+room: /players/fizban/egypt/set_shrine
+name: Dark Shrine
+page: 25
+map: [430 270 420 270 420 250 450 250 450 270 440 270] mazeroom
+	430 250 10 7 0 shadebox

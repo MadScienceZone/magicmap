@@ -1,0 +1,15 @@
+#
+# default realm (for testing creator detection)
+#
+#
+
+room: /room/entrance
+page: 1
+map:  (Museum) (Entrance) 380 430 std proto room
+      east passage
+      385 420 mv (\(See p. 20\)) show
+room: /room/entrance2
+page: 1
+map:  (Museum) (Entrance) 480 430 std proto room
+      east passage
+      385 420 mv (\(See p. 20\)) show

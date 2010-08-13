@@ -1,0 +1,7 @@
+room: /players/fizban/egypt/treasure
+name: Maze
+page: 25
+map: (    True Tomb) (    of the King) 270 460 70 70 room
+	east locked door
+	np 280 460 mv 280 490 ln stroke
+	np 280 500 mv 280 530 ln stroke

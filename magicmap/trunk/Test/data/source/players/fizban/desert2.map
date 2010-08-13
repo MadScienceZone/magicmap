@@ -1,0 +1,5 @@
+room: /players/fizban/egypt/desert2
+name: Lost in the desert
+page: 24
+map:  % no map (that's what lost in the desert means :)
+also: /players/fizban/egypt/desert1

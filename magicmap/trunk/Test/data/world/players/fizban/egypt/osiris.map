@@ -1,0 +1,9 @@
+room: /players/fizban/egypt/osiris
+name: Garden of Osiris
+page: 24
+map:  wh np 170 600 mv 145 590 150 565 165 550 curveto
+	 175 550 ln 190 565 195 590 170 600 curveto  fill
+	  bk np 170 600 mv 145 590 150 565 165 550 curveto stroke
+	  bk np 175 550 mv 190 565 195 590 170 600 curveto stroke
+	  gr np 170 590 mv 157 580 160 575 170 560 curveto
+	  180 575 183 580 170 590 curveto fill bk

@@ -1,0 +1,7 @@
+room: /players/fizban/egypt/maze42
+name: Maze
+page: 25
+map: [360 590 360 610 370 610 370 600 390 600 390 590 370 590] dark mazearea
+	[360 590 360 610 370 610 370 600 390 600] mazewall
+	[390 590 370 590] mazewall
+	365 595 1.5 dotmark

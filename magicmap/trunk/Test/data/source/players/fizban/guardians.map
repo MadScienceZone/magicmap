@@ -1,0 +1,14 @@
+room: /players/fizban/egypt/guardians
+name: Guardians
+page: 25
+map: () () 465 555 15 round-room
+	451 553 10 4 0 shadebox
+	469 553 10 4 0 shadebox
+	% corridor
+    [460 500 460 540 470 540 470 500] mazearea
+	[460 500 460 540] mazewall
+	[470 500 470 540] mazewall
+	% corridor
+	[460 570 460 600 470 600 470 570] mazearea
+	[460 570 460 600] mazewall
+	[470 570 470 600] mazewall

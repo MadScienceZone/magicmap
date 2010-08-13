@@ -1,0 +1,25 @@
+room: /players/fizban/egypt/pyramid
+name: Outside Pyramid
+page: 24
+realm: Aardvark's Museum: "Treasures of Ancient Egypt"
+map:  (Outside)(Pyramid) 280 110 std room east passage southwest passage
+	  268 110 mv (Dn) show
+	  250 97 mv (Up) show
+      (   Well) () 250 80 15 dark round-room
+	  east special passage
+	  280 70 mv 10 it (Exit to) show
+	  280 60 mv (museum) show
+	  280 50 mv (\(p. 20\)) show
+      
+bg:   30 150 545 540 .5 shadebox
+      [] 0 sd bk
+      np 30 150 mv 575 690 ln stroke
+      np 30 690 mv 575 150 ln stroke
+      /fizbanEgyptSquareRoom { gsave translate [5 -10 5 0 0 0 0 5 -10 5
+      -10 15 0 15 0 20 5 20 5 30 15 30 15 20 20 20 20 15 30 15
+      30 5 20 5 20 0 15 0 15 -10] dark mazearea [5 -10 5 0 0 0 0 5 -10 5] mazewall
+      [-10 15 0 15 0 20 5 20 5 30] mazewall [15 30 15 20 20 20 20 15 30 15] mazewall
+      [30 5 20 5 20 0 15 0 15 -10] mazewall grestore } def
+      /fizbanEgyptVdots { gsave translate 0 0 .5 dotmark 0 3 .5 dotmark 0 6 .5 
+      dotmark grestore } def /fizbanEgyptHdots { gsave translate 0 0 .5 dotmark 
+      3 0 .5 dotmark 6 0 .5 dotmark grestore } def

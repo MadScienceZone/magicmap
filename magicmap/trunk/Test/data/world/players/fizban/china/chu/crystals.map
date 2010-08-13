@@ -1,0 +1,7 @@
+room:   /players/fizban/china/chu/crystals
+name:   North Platform
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page:   172
+map: 	(North)(Platform)365 590 std room
+	south passage
+

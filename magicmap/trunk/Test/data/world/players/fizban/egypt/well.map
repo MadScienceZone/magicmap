@@ -1,0 +1,6 @@
+room: /players/fizban/egypt/well
+name: In Well
+page: 20
+map:  (   Well)() 140 345 15 proto dark round-room
+         east special passage
+         120 320 moveto (\(See p. 24\)) show

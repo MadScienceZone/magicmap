@@ -1,0 +1,8 @@
+room: /players/fizban/egypt/e_tomb
+name: East Tomb
+page: 24
+map:  [330 205 345 205 345 195 374 195 375 
+      225 345 225 345 215 330 215 330 205]
+      dark mazeroom txtf 332 207 mv (S) show
+      370 205 5 10 0 shadebox
+

@@ -1,0 +1,7 @@
+room: /players/fizban/egypt/maze20
+name: Maze
+page: 25
+map: [300 610 300 590 320 590 320 580 330 590 340 590 340 600 310 600] dark mazearea
+	[310 600 340 600 340 590 330 590] mazewall
+	[320 580 320 590 300 590 300 610] mazewall
+	322 592 mv txtf (A) show

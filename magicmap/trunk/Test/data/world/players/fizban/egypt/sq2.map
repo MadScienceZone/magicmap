@@ -1,0 +1,13 @@
+room: /players/fizban/egypt/sq2
+name: Landing
+page: 24
+map:  % XXX 160 280 fizbanEgyptSquareRoom 
+	% XXX 10 165 300 fizbanEgyptStaircase
+	% XXX 10 165 270 fizbanEgyptStaircase
+bg: % XXX /fizbanEgyptStaircase { gsave translate /fizbanH exch def
+	% XXX [0 0 0 fizbanH 10 fizbanH 10 0] dark mazearea [0 0 0 fizbanH] mazewall
+	% XXX [10 fizbanH 10 0] mazewall 0 2 fizbanH { dup 2 exch np mv 8 exch ln stroke
+	% XXX } for grestore } def
+
+      
+

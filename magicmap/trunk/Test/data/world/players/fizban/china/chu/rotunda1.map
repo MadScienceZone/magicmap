@@ -1,0 +1,8 @@
+room:   /players/fizban/china/chu/rotunda1
+name:   Observatory Rotunda (lower level)
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page:   172
+map: 	14 it 280 620 mv (Zhong Zheng Observatory) show
+		()()390 420 stdr round-room
+			east passage
+		(Tower)(\(Lower\))390 420 25 round-room

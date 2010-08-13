@@ -1,0 +1,53 @@
+______________________________________________________________________________
+Ragnarok MUD Magic Mapper Client Installation Notes
+
+Prerequisites:
+  Before beginning, check that your system includes the following software.
+    * Python 2.6 or later (This application has not been tested for Python 3.x
+      and most likely will not work.)
+
+  To install Python, go to http://python.org and download the installation
+  package appropriate for your system.
+      
+______________________________________________________________________________
+(1) Unpack the Magic Mapper distribution into a temporary working directory,
+    and change to that directory.
+
+       $ tar xvzf MagicMapper-0.1a2.tar.gz
+       $ cd MagicMapper-0.1a2
+
+______________________________________________________________________________
+(2) If you wish to validate the Magic Mapper, you may run the unit tests
+    which will check out its internal code to make sure it produces the
+    expected results.  The simplest way to do this is:
+
+       $ cd Test
+       $ ./texttestrunner
+       $ cd ..
+
+______________________________________________________________________________
+(3) To install the Magic Mapper onto your system, just run:
+
+       $ python setup.py install
+
+     You will need sufficient permissions to write the class library
+     files into your Python site_packages directory and the user scripts
+     into a public bin directory (usually /usr/bin by default).  You may
+     choose to have setup.py install these files into another location
+     (for example, if you want them installed in your own home directory).
+     To see the list of options you can give to the setup script, run:
+
+           $ python setup.py install --help
+
+     In particular, you probably want to use --home if installing MagicMapper
+     locally in your home directory, or --prefix, --install-purelib,
+     and/or --install-scripts if you are an administrator wishing to
+     install into a non-standard directory.
+
+________________________________________________________________________________
+(4) Note that the documentation files under the "man" directory are not
+    installed anywhere by default.  If you want the documents added
+    to your "man" command, copy these into the appropriate manpage
+    directories on your system.  PDF copies of these documents are also
+    available under the "man/pdf" directory.  You can copy these where
+    you can refer to them as needed.

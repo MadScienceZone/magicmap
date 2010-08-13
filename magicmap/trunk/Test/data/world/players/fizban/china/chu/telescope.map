@@ -1,0 +1,7 @@
+room:   /players/fizban/china/chu/telescope
+name:   West Platform
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page:   172
+map: (West)(Platform)290 530 std room
+	east passage
+

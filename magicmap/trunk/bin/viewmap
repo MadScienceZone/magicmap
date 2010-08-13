@@ -1,0 +1,269 @@
+#!/usr/local/bin/python
+# vi:set ai sm nu ts=4 sw=4 expandtab:
+#
+# RAGNAROK MAGIC MAPPER SOURCE CODE: mapping client
+# $Header$
+#
+# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# All Rights Reserved.  Licensed under the Open Software License
+# version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
+# for details.
+#
+# Based on earlier code from the Ragnarok MudShell (MSH) client,
+# Copyright (c) 1993, 2000, 2001, 2002, 2003 by Steven L. Willoughby,
+# Aloha, Oregon, USA.  All Rights Reserved.  MSH is licensed under
+# the terms of the GNU General Public License (GPL) version 2.
+#
+# This product is provided for educational, experimental or personal
+# interest use, in accordance with the terms and conditions of the
+# aforementioned license agreement, ON AN "AS IS" BASIS AND WITHOUT
+# WARRANTY, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION,
+# THE WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A
+# PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY OF THE ORIGINAL
+# WORK IS WITH YOU.  (See the license agreement for full details,
+# including disclaimer of warranty and limitation of liability.)
+#
+# Under no curcumstances is this product intended to be used where the
+# safety of any person, animal, or property depends upon, or is at
+# risk of any kind from, the correct operation of this software.
+#
+
+import sys
+import os, os.path
+import wx
+import optparse
+import itertools
+import datetime
+from   glob    import glob
+from   fnmatch import fnmatch
+
+sys.path.append(os.path.join('..','lib'))
+
+from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
+config = ConfigurationManager()
+from RagnarokMUD.MagicMapper.MapSource            import MapSource, MapFileFormatError, DuplicateRoomError
+from RagnarokMUD.MagicMapper.GUI.MapCanvas        import MapCanvas
+from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
+
+op = optparse.OptionParser(usage='%prog [-ghir] [-p pattern] mapfiles...', version='1.0')
+op.set_defaults(pattern='*.map')
+op.add_option('-g', '--expand-globs', action='store_true', help='Expand wildcard patterns in filename list')
+op.add_option('-i', '--ignore-errors',action='store_true', help='Keep trying to finish even if some errors were found')
+op.add_option('-p', '--pattern',      metavar='PAT',       help='Limit recursion to filenames matching wildcard pattern [%default]')
+op.add_option('-r', '--recursive',    action='store_true', help='Recurse into subdirectories looking for map files')
+#op.add_option('-v', '--verbose',      action='count',      help='Increase verbosity (cumulative)')
+
+opt, cmd_map_file_list = op.parse_args()
+
+
+print """
+             Ragnarok Magic Map 6.0b1 Preview Tool (viewmap)
+                  *** PRE-RELEASE PREVIEW VERSION ***
+
+Thank you for helping us test this program prior to releasing it as ready
+for full production use.  In this version, this window will show some 
+debugging information which you may or may not find useful in the testing
+process.
+
+Error messages about your map pages will show up here as well.  Eventually
+they will be put in a GUI window for you.
+"""
+
+#
+# Display pages
+#
+class MapViewerFrame(wx.Frame):
+    def __init__(self, parent, **k):
+        wx.Frame.__init__(self, parent, **k)
+        self.CreateStatusBar()
+        self.SetStatusText("Initializing Magic Map...")
+
+        self._setup_menus((
+            ('&File', (
+                ('&Open', 'Open map file(s) to display', self.OnOpen, wx.ID_OPEN),
+                (None, None, None, None),
+                ('E&xit', 'Terminate the program', self.OnCloseWindow, wx.ID_EXIT),
+            )),
+            ('&Edit', (
+                ('&Preferences...', 'Change configuration settings', self.OnEditPreferences, wx.ID_PREFERENCES),
+            )),
+            ('&View', (
+                ('&Reload', 'Reload all map pages from source files', self.OnReload, wx.ID_REFRESH),
+                ('&Location Test', 'Cycle through all locations on this page', self.OnLocationTest, -1),
+                (None, None, None, None),
+                ('&Normal size', 'Change magnification to 100%', self.OnZoom100, wx.ID_ZOOM_100),
+                ('&Zoom in', 'Increase magnification +10%', self.OnZoomIn, wx.ID_ZOOM_IN),
+                ('Zoom &out', 'Decrease magnification -10%', self.OnZoomOut, wx.ID_ZOOM_OUT),
+            )),
+            ('&Help', (
+                ('&Documentation...', 'Where to get program documentation online', self.OnHelp, wx.ID_HELP),
+                ('&About viewmap...', 'At-a-glance info about viewmap', self.OnAbout, wx.ID_ABOUT),
+            )),
+        ))
+        self.OnReload(None)
+
+    def _setup_menus(self, menu_list):
+        menu_bar = wx.MenuBar()
+        for menu, item_list in menu_list:
+            the_menu = wx.Menu()
+            for title, description, binding, id in item_list:
+                if title:
+                    self.Bind(wx.EVT_MENU, binding, the_menu.Append(id, title, description))
+                else:
+                    the_menu.AppendSeparator()
+            menu_bar.Append(the_menu, menu)
+        self.SetMenuBar(menu_bar)
+
+    def OnReload(self, event): 
+        #
+        # Get list of map files to preview
+        #
+        if opt.expand_globs:
+            map_file_list = list(itertools.chain(*[glob(pattern) for pattern in cmd_map_file_list]))
+        else:
+            map_file_list = cmd_map_file_list
+
+        if opt.recursive:
+            root_list, map_file_list = map_file_list, []
+            for root in root_list:
+                for dirpath, dirnames, filenames in os.walk(root):
+                    map_file_list.extend([os.path.join(dirpath, f) for f in filenames if fnmatch(f, opt.pattern)])
+        #
+        # Load and compile them into memory
+        #
+        self.world_map = MapSource()
+
+        for map_file in map_file_list:
+            print "*** Loading {0} ***".format(map_file)
+            try:
+                self.world_map.add_from_file(open(map_file))
+            except (MapFileFormatError, DuplicateRoomError) as problem:
+                print "ERROR in {0}: {1}".format(map_file, problem)
+                if not opt.ignore_errors:
+                    print "Processing stopped on fatal map error (use --ignore-errors to avoid this)."
+                    sys.exit(1)
+        print "\n*** Loaded {0} page{1} ({2} room{3}) from {4} map source file{5}. ***".format(
+                len(self.world_map.pages), '' if len(self.world_map.pages)==1 else 's',
+                len(self.world_map.room_page), '' if len(self.world_map.room_page)==1 else 's',
+                len(map_file_list), '' if len(map_file_list)==1 else 's'
+        )
+        print "Map page list:", sorted(self.world_map.pages.keys())
+        self.canvas = MapCanvas(self, self.world_map.pages[self.world_map.pages.keys()[2]], config=config)
+        #canvas = MapCanvas(self, world_map.pages[173])
+        self.canvas.Fit()
+
+    def OnLocationTest(self, event): 
+        wx.FutureCall(1, self.NextLocationTest, [room.id for room in self.canvas.page_obj.rooms.values()])
+
+    def NextLocationTest(self, room_id_list):
+        if len(room_id_list) > 1:
+            wx.FutureCall(2000, self.NextLocationTest, room_id_list[1:])
+
+        if len(room_id_list) > 0:
+            print "***", room_id_list[0], "***", len(room_id_list), '***'
+            self.canvas.SetCurrentLocation(room_id_list[0])
+
+    def OnZoom100(self, event): self._not_yet()
+    def OnZoomIn(self, event): self._not_yet()
+    def OnZoomOut(self, event): self._not_yet()
+    def OnEditPreferences(self, event): self._not_yet()
+    def OnOpen(self, event): 
+        dlg = wx.FileDialog(self, 'Open Map File(s)', 
+            wildcard='Magic Map files (*.map)|*.map|All Files (*.*)|*.*', 
+            style=wx.OPEN | wx.MULTIPLE)
+        if dlg.ShowModal() == wx.ID_OK:
+            print "XXX Selected:", dlg.GetFilename(), dlg.GetPath(), dlg.GetDirectory()
+        dlg.Destroy()
+
+    def OnCloseWindow(self, event):
+        self.Close(True)
+
+    def Alert(self, text, title, flags):
+        dlg = wx.MessageDialog(self, text, title, flags)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def _not_yet(self):
+        self.Alert("Not yet implemented", "Error", wx.OK | wx.ICON_ERROR)
+
+    def OnAbout(self, event):
+        self.Alert('''Ragnarok Magic Mapper 6.0b1: viewmap
+
+This application allows wizards to preview
+what their maps will look like by loading
+the raw "source" form of the map pages into
+this viewer.
+
+Run with the --help option for more details,
+or see the documentation online at
+http://www.rag.com/tech/tools/viewmap.
+
+Copyright (c) 1993, 2000, 2001, 2002, 2003, 2010.
+All Rights Reserved.  See accompanying license for
+usage and distribution rights information.''', 
+            "About viewmap", wx.OK | wx.ICON_INFORMATION)
+
+    def OnHelp(self, event):
+        self.Alert('''The official documentation for this program can be found
+online at the following URL:
+
+http://www.rag.com/tech/tools/viewmap
+
+A brief synopsis of viewmap's usage may be displayed by
+running it with the --help option.''', "Documentation Link", wx.OK | wx.ICON_INFORMATION)
+
+class MapPreviewApp(wx.App):
+    def OnInit(self):
+        display_splash_screen('viewmaplogo.png')
+        frame = MapViewerFrame(None, title="Magic Map Preview")
+        frame.Show()
+        self.SetTopWindow(frame)
+        return True
+
+    def OnExit(self):
+        print "***Shutting down***"
+
+Application = MapPreviewApp(redirect=False)
+#for page in sorted(world_map.pages):
+#    print "*** Displaying page {0} ***".format(page)
+#    page_frame = wx.Frame(None, title='Magic Map Page {0}'.format(page))
+#    page_image = MapCanvas(page_frame, world_map.pages[page])
+#    page_image.Fit()
+#    page_frame.Show()
+#    page_image.current_location = world_map.pages[page].rooms[world_map.pages[page].rooms.keys()[0]].id
+
+Application.MainLoop()
+#
+# Style notes:
+#  1. import wx (not * or wxPython.wx stuff)
+#  2. constructors should use kw args
+#  3. Don't use IDs; wx.ID_ANY if needed
+#     But use standard IDs like wx.ID_EXIT
+#  4. Use Bind() for events
+#  5. sizers, not absolute positions
+#  6. wx.App, not wx.PySimpleApp
+#  7. separate classes, not nested panels in one
+#  8. native preferred over wx: size=(500,400) not size=wx.Size(500,400)
+#  9. docstrings
+# 10. StdDialogButtonSizer adapts to platform look and feel
+# 
+
+# Tk code
+#import sys
+#import Tkinter
+#from Tkconstants import *
+#
+#class MagicMapperApp (Tkinter.Frame):
+#    def create_widgets(self):
+#        self.QUIT = Tkinter.Button(self, text='Exit', fg='red', command=self.quit)
+#        self.QUIT.pack(side=LEFT)
+#
+#    def __init__(self, master=None):
+#        Tkinter.Frame.__init__(self, master)
+#        self.pack()
+#        self.create_widgets()
+#
+#root = Tkinter.Tk()
+#app = MagicMapperApp(master=root)
+#app.mainloop()
+#root.destroy()

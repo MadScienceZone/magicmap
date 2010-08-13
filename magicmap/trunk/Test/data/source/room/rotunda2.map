@@ -1,0 +1,10 @@
+room:   /players/fizban/china/chu/rotunda2
+name:   Observatory Rotunda (upper level)
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page:   1
+map: 	()()390 540 stdr round-room
+	north passage
+	south passage
+	east passage
+	west passage
+	(\(Upper)(Level\))390 540 25 round-room

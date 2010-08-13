@@ -1,0 +1,50 @@
+#
+# Test excerpts from Fizban's realm.map
+#
+
+room: /players/fizban/aardvark/entrance
+page: 5
+map:  (Museum) (Entrance) 380 430 std proto room
+      east passage
+      385 420 mv (\(See p. 20\)) show
+
+room: /players/fizban/aardvark/egypt
+page: 20
+map:  (Ancient) (Egypt)  175  335 std room
+         east passage
+
+room: /players/fizban/aardvark/india
+page: 20
+map:  (Hall of) (India)  250  395 std room
+         south passage
+
+room: /players/fizban/aardvark/prehistory
+page: 20
+map:  (Hall of) (Prehistory)  345  285 std room
+         west passage
+      332 297 moveto (Up) show
+
+room: /players/fizban/aardvark/proto-south
+page: 20
+map:  % obsolete
+
+room: /players/fizban/aardvark/china
+page: 20
+map:  (Ancient)(China) 250 275 std room north passage
+
+room: /players/fizban/aardvark/rotunda
+page: 20
+realm: Aardvark's Museum--Gateway to Adventureland
+map:  (Heimdall's) (Path) 395 335 std proto outdoor room
+      450 341 moveto (\(See p. 3\)) show
+      (Museum) (Entrance) 325 335 std outdoor room
+         east passage west passage
+      %/ZapfChancery-MediumItalic findfont 16 scalefont setfont
+      %30 675 moveto (Aardvark's Museum\320Gateway to Adventureland) show
+      (Museum) (Rotunda) 275 345 stdr round-room
+         north passage
+         east passage
+         west passage
+         south passage
+         southeast passage
+      301 320 moveto (Dn) show

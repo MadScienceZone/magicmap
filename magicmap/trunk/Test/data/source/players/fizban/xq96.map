@@ -1,0 +1,8 @@
+room:   /players/fizban/china/xiangqi/xq96
+name:   Xiangqi Level
+realm:  Aardvark's Museum: "Wonders of Ancient China"
+page: 171
+map:    [390 130 390 155] outdoor mazewall
+       [390 165 390 190] outdoor mazewall
+       np 1 0 0 color 3 lw 330 160 mv 60  0 rln stroke
+       np                  360 130 mv  0 60 rln stroke

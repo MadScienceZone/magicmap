@@ -1,0 +1,12 @@
+room: /players/fizban/egypt/entrance
+name: Great (entrance) Hall
+page: 24
+map:  [295 150 295 180 280 180 280 240
+       330 240 330 180 315 180 315 150 295 150] dark mazeroom
+      ()()305 150 0 0 room south locked door
+      295 190 1.2 dotmark 295 200 1.2 dotmark
+      295 210 1.2 dotmark 295 220 1.2 dotmark
+      315 190 1.2 dotmark 315 200 1.2 dotmark
+      315 210 1.2 dotmark 315 220 1.2 dotmark
+      290 230 30 10 box   294 234 22  6 box
+      302 237  6  3 0 shadebox 
