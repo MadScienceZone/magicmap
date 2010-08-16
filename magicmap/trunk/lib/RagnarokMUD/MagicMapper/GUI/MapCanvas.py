@@ -130,7 +130,7 @@ class MapCanvas (wx.Panel):
         # XXX flip to page?  or is that a higher-level management layer?
         if self.current_location != room_id:
             self.current_location = room_id
-            self.OnPaint(None)
+            self.Refresh()
 
     def DrawMapAreaFill(self, dc, x, y, w, h, r, g, b):
         "[A,x,y,w,h,r,g,b] -> rectangular area at (x,y) by (w,h) filled in specified color"
@@ -368,6 +368,9 @@ class MapCanvas (wx.Panel):
                 utext += translation_table[ch]
             else:
                 utext += ch
+
+        if self.MMap_CurrentFont[0] not in self.FontCodeTranslation:
+            raise InvalidDrawingElement('Font code {0} not understood.'.format(self.MMap_CurrentFont[0]))
 
         dc.SetFont(wx.Font(self.MMap_CurrentFont[1] * self.font_magnification, *self.FontCodeTranslation[self.MMap_CurrentFont[0]]))
         dc.SetTextForeground(self.MMap_CurrentColour)

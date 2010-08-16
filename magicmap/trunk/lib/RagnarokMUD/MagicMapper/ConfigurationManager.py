@@ -40,23 +40,26 @@ class ConfigurationManager (ConfigParser.SafeConfigParser):
         my_image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GUI', 'images')
         for section_name, section_contents in {
                 'rendering': {
-                    'bezier_points':       '20',
-                    'canvas_left_margin':  '30',
-                    'canvas_top_margin':   '50',
+                    'bezier_points':        '20',
+                    'canvas_left_margin':   '30',
+                    'canvas_top_margin':    '50',
                     'font_magnification':   '0.85',
-                    'logo_image':          os.path.join(my_image_path, 'RagnarokMapLogo.png'),
-                    'background_tile':     os.path.join(my_image_path, 'parchment.png'),
-                    'page_number_font':   'r',
+                    'logo_image':           os.path.join(my_image_path, 'RagnarokMapLogo.png'),
+                    'background_tile':      os.path.join(my_image_path, 'parchment.png'),
+                    'page_number_font':    'r',
                     'page_number_size':    '48',
-                    'page_number_x':      '170',
+                    'page_number_x':       '170',
                     'page_number_y':       '720',
-                    'page_title_font':   's',
-                    'page_title_size':    '12',
-                    'page_title_x':      '300',
-                    'page_title_y':       '745',
-                    'page_title2_x':      '300',
+                    'page_title_font':     's',
+                    'page_title_size':     '12',
+                    'page_title_x':        '300',
+                    'page_title_y':        '745',
+                    'page_title2_x':       '300',
                     'page_title2_y':       '730',
                     'XXX_image_test_area': '../Test/data/images',
+                },
+                'preview':  {
+                    'location_delay':      '1.0',
                 },
         }.iteritems():
             self.add_section(section_name)

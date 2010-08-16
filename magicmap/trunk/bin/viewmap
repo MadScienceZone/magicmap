@@ -156,12 +156,12 @@ class MapViewerFrame(wx.Frame):
         wx.FutureCall(1, self.NextLocationTest, [room.id for room in self.canvas.page_obj.rooms.values()])
 
     def NextLocationTest(self, room_id_list):
-        if len(room_id_list) > 1:
-            wx.FutureCall(2000, self.NextLocationTest, room_id_list[1:])
-
         if len(room_id_list) > 0:
+            wx.FutureCall(config.getfloat('preview', 'location_delay')*1000.0, self.NextLocationTest, room_id_list[1:])
             print "***", room_id_list[0], "***", len(room_id_list), '***'
             self.canvas.SetCurrentLocation(room_id_list[0])
+        else:
+            self.canvas.SetCurrentLocation(None)
 
     def OnZoom100(self, event): self._not_yet()
     def OnZoomIn(self, event): self._not_yet()
