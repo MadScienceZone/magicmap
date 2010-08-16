@@ -105,7 +105,7 @@
 #
 # <shade>     ::= <float>   (0=black, 1=white)
 # <r>, <g>, <b> :: <float>  (0=black, 1=full color)
-# <room-opts> ::= ( outdoor | proto | dark )*
+# <room-opts> ::= ( outdoor | proto | dark | <shade> shaded )*
 # <passages> ::= ([<w> passageLength] <dir> [in|out|special|offpage]* passage)*
 # <doors>    ::= ( <dir> [locked] door )*
 # <drawing-cmd> ::= <x> <y> mv|moveto
@@ -168,11 +168,16 @@ class RoomAttributes (object):
     def __init__(self, f):
         self.f = f
     def __call__(self, f_self, *args):
-        returnval = self.f(f_self, ''.join(sorted(f_self.room_flags)), *args)
+        if f_self.room_shade is None:
+            shade = ''
+        else:
+            shade = '$%02d' % max(min(int(f_self.room_shade*100), 0), 99)
+        returnval = self.f(f_self, ''.join(sorted(f_self.room_flags)) + shade, *args)
         f_self.room_flags.clear()
         f_self.exit_flags.clear()
         f_self.exit_direction = None
         f_self.exit_length = DEFAULT_EXIT_LENGTH
+        f_self.room_shade = None
         return returnval
 
 class ExitAttributes (object):
@@ -187,6 +192,7 @@ class ExitAttributes (object):
         f_self.exit_flags.clear()
         f_self.exit_direction = None
         f_self.exit_length= DEFAULT_EXIT_LENGTH
+        f_self.room_shade = None
         return returnval
 
 class RequireArgs (object):
@@ -459,6 +465,7 @@ class MapSource (object):
         self.drawing_flags = set()
         self.exit_direction = None
         self.exit_length= DEFAULT_EXIT_LENGTH
+        self.room_shade = None
         self.current_room_exits = None
         self.current_point = None
         self.drawing_mode_list = None
@@ -669,6 +676,8 @@ class MapSource (object):
                         raise MapFileFormatError('Exit declared to be going multiple directions!')
                 else:
                     self.exit_direction = ps_exit_directions[ps_token]
+            elif ps_token == 'shaded':
+                self._ps_shaded()
             elif ps_token == 'passageLength' or ps_token == 'passagelength':
                 self._ps_passage_length()
             elif ps_token == 'door':
@@ -1301,6 +1310,10 @@ class MapSource (object):
     @RequireArgs('passagelength', 'd')
     def _ps_passage_length(self):
         self.exit_length = self.stack.pop()
+
+    @RequireArgs('shaded', 'k')
+    def _ps_shaded(self):
+        self.room_shade = self.stack.pop()
 
     @RequireArgs('room', 'ssccdd')
     @RoomAttributes

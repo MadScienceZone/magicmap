@@ -56,10 +56,10 @@ class ConfigurationManager (ConfigParser.SafeConfigParser):
                     'page_title_y':        '745',
                     'page_title2_x':       '300',
                     'page_title2_y':       '730',
-                    'XXX_image_test_area': '../Test/data/images',
                 },
                 'preview':  {
                     'location_delay':      '1.0',
+                    'image_dir':           os.path.join('~', 'mapimages'),
                 },
         }.iteritems():
             self.add_section(section_name)

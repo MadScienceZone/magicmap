@@ -41,10 +41,14 @@ class MapDataFormatError (Exception):
 class InvalidDrawingElement (MapDataFormatError):
     "The specification of a map-drawing object was incorrect."
 
+class InvalidRoomFlag (InvalidDrawingElement):
+    "The flags for a room are wrong"
+
 class MapDataProcessingError (Exception):
     "Problem encountered trying to handle a location."
 
-class MapCanvas (wx.Panel):
+#class MapCanvas (wx.Panel):
+class MapCanvas (wx.ScrolledWindow):
     FontCodeTranslation = {
             'b':    (wx.FONTFAMILY_SWISS,    wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD),
             'i':    (wx.FONTFAMILY_ROMAN,    wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL),
@@ -55,10 +59,12 @@ class MapCanvas (wx.Panel):
             'T':    (wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL),
     }
 
-    def __init__(self, parent, page_obj=None, config=None, *a, **k):
-        wx.Panel.__init__(self, parent, *a, **k)
+    def __init__(self, parent, size=wx.DefaultSize, page_obj=None, config=None, image_dir=None, *a, **k):
+        #wx.Panel.__init__(self, parent, size, style=wx.SUNKEN_BORDER, *a, **k)
+        wx.ScrolledWindow.__init__(self, parent, size=size, style=wx.SUNKEN_BORDER, *a, **k)
 
         self.config = config
+        self.image_dir = image_dir
         self.canvas_left_margin = self.config.getfloat('rendering', 'canvas_left_margin')
         self.canvas_top_margin = self.config.getfloat('rendering', 'canvas_top_margin')
         self.font_magnification = self.config.getfloat('rendering', 'font_magnification')
@@ -100,6 +106,15 @@ class MapCanvas (wx.Panel):
             'T': (self.DrawMapTree,          2, True),
             'V': (self.DrawMapVector,        4, False),
         }
+
+        self.SetVirtualSize((1000,1000))
+        self.SetScrollRate(20,20)
+
+    def display_page(self, new_page_obj):
+        "Switch to displaying a new page object."
+        if new_page_obj != self.page_obj:
+            self.page_obj = new_page_obj
+            self.Refresh()
 
     def _pos_map2wx(self, x, y):
         "Convert map (x,y) position (lower-left origin) to wx (upper-lefe) as (x,y) tuple"
@@ -150,11 +165,17 @@ class MapCanvas (wx.Panel):
         "[G, x, y, w, h, id] -> draw image at (x,y) scaled to (w,h)"
 
         if (image_id,w,h) not in self.image_cache:
+            image_filename = os.path.join(os.path.expanduser(self.image_dir or self.config.get('preview', 'image_dir')), image_id[0], image_id)
             if w == 0 and h == 0:
-                self.image_cache[(image_id,w,h)] = wx.BitmapFromImage(wx.Image(os.path.join(self.config.get('rendering', 'XXX_image_test_area'), image_id[0], image_id), wx.BITMAP_TYPE_PNG))
+                the_image = wx.BitmapFromImage(wx.Image(image_filename, wx.BITMAP_TYPE_PNG))
             else:
-                self.image_cache[(image_id,w,h)] = wx.BitmapFromImage(wx.Image(os.path.join(self.config.get('rendering', 'XXX_image_test_area'), image_id[0], image_id), wx.BITMAP_TYPE_PNG).Rescale(w, h))
-        dc.DrawBitmap(self.image_cache[(image_id,w,h)], x, y, True)
+                the_image = wx.BitmapFromImage(wx.Image(image_filename, wx.BITMAP_TYPE_PNG).Rescale(w, h))
+            self.image_cache[(image_id,w,h)] = the_image
+        else:
+            the_image = self.image_cache[(image_id,w,h)]
+
+        x, y = self._pos_map2wx(x, y+the_image.GetHeight())
+        dc.DrawBitmap(the_image, x, y, True)
 
     def _standard_colour(self, flags):
         '''Given set of flags, return appropriate pen and brush:
@@ -162,12 +183,33 @@ class MapCanvas (wx.Panel):
                 @    use color set for current location
                 o    use outdoor pen
                 d    use dark brush
+                $nn  use shade value nn (00-99)
         '''
+        shade_i = flags.find('$')
+        shade_v = None
+        if shade_i >= 0:
+            try:
+                shade_v = int(flags[shade_i+1:shade_i+3])
+            except ValueError:
+                raise InvalidRoomFlag('Unrecognized use of $xx room flag ({0})'.format(flags[shade_i:shade_i+3]))
+
         if '@' in flags:
-            brush_colour = self.MMap_HereDarkColour if 'd' in flags else self.MMap_HereLightColour
+            if shade_v is not None:
+                brush_colour = (shade_v, shade_v, 0)
+            elif 'd' in flags:
+                brush_colour = self.MMap_HereDarkColour
+            else:
+                brush_colour = self.MMap_HereLightColour
+
             pen_colour = self.MMap_HereOutdoorColour if 'o' in flags else self.MMap_HereIndoorColour
         else:
-            brush_colour = self.MMap_DarkColour if 'd' in flags else self.MMap_LightColour
+            if shade_v is not None:
+                brush_colour = (shade_v, shade_v, shade_v)
+            elif 'd' in flags:
+                brush_colour = self.MMap_DarkColour 
+            else:
+                brush_colour = self.MMap_LightColour
+
             pen_colour = self.MMap_OutdoorColour if 'o' in flags else self.MMap_IndoorColour
 
         pen_width = self.MMap_OutdoorWidth if 'o' in flags else self.MMap_IndoorWidth
@@ -581,7 +623,7 @@ class MapCanvas (wx.Panel):
                     if this_room.reference_point is not None:
                         self.SetMapColour(dc, 1,0,0)
                         self.SetMapLineWidth(dc, 1)
-                        self.SetMapDashPattern(dc, [4,3], 0)
+                        self.SetMapDashPattern(dc, [4,10], 0)
                         dc.SetPen(self.MMap_CurrentPen)
                         dc.CrossHair(*self._pos_map2wx(*this_room.reference_point))
                         self.SetMapDashPattern(dc)
