@@ -39,7 +39,7 @@ from wx.lib.wordwrap import wordwrap
 from RagnarokMUD.MagicMapper.GUI.MapCanvas import MapCanvas
 from RagnarokMUD.MagicMapper.MapSource     import MapSource, MapFileFormatError, DuplicateRoomError
 
-class MapViewerFrame(wx.Frame):
+class MapViewerFrame (wx.Frame):
     def __init__(self, parent=None, image_dir=None, config=None, prog_name=None, about_text=None, help_text=None, **k):
         wx.Frame.__init__(self, parent, **k)
 
@@ -55,8 +55,13 @@ class MapViewerFrame(wx.Frame):
 
         self.CreateStatusBar()
         self.canvas = MapCanvas(self, config=config, image_dir=image_dir)
-        self.canvas.Fit()
-        self.SetStatusText("Initializing Magic Map...")
+        box = wx.BoxSizer(wx.VERTICAL)
+        box.Add(self.canvas, 1, wx.EXPAND)
+        self.SetAutoLayout(True)
+        self.SetSizer(box)
+        self.Layout()
+
+        #self.canvas.Fit()
 
     def _setup_menus(self, menu_list):
         menu_bar = wx.MenuBar()
@@ -89,7 +94,7 @@ class MapViewerFrame(wx.Frame):
     def OnAbout(self, event):
         about = wx.AboutDialogInfo()
         about.Name = self.prog_name
-        about.Version = '6.0b1'  # XXX FIXME
+        about.Version = '%MAGICMAP_RELEASE%'
         about.Copyright = 'Ragnarok Magic Mapper (c) 1993, 2000, 2001, 2002, 2003, 2010.  All Rights Reserved.'
         about.Description = wordwrap(self.about_text, 500, wx.ClientDC(self))
         about.WebSite = "http://www.rag.com/tech/tools/{0}".format(self.prog_name), "Program information and documentation"
@@ -174,6 +179,7 @@ class MapPreviewFrame (MapViewerFrame):
 
     def OnReload(self, event): 
         "Read the files the user wants to display into our map collection."
+        self.SetStatusText("Loading Magic Map...")
         #
         # Get list of map files to preview
         #
@@ -218,6 +224,7 @@ class MapPreviewFrame (MapViewerFrame):
             )
             print "Map page list:", sorted(self.world_map.pages)
 
+        self.SetStatusText("")
         #
         # Display first page
         #

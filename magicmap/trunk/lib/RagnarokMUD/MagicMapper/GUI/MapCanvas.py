@@ -61,7 +61,7 @@ class MapCanvas (wx.ScrolledWindow):
 
     def __init__(self, parent, size=wx.DefaultSize, page_obj=None, config=None, image_dir=None, *a, **k):
         #wx.Panel.__init__(self, parent, size, style=wx.SUNKEN_BORDER, *a, **k)
-        wx.ScrolledWindow.__init__(self, parent, size=size, style=wx.SUNKEN_BORDER, *a, **k)
+        wx.ScrolledWindow.__init__(self, parent, -1, (0,0), size=size, style=wx.SUNKEN_BORDER, *a, **k)
 
         self.config = config
         self.image_dir = image_dir
@@ -110,11 +110,22 @@ class MapCanvas (wx.ScrolledWindow):
         self.SetVirtualSize((1000,1000))
         self.SetScrollRate(20,20)
 
+        self.buffer = wx.EmptyBitmap(1000,1000)
+        dc = wx.BufferedDC(None, self.buffer)
+        self.RenderMapToDC(dc)
+
+    def OnPaint(self, event):
+        dc = wx.BufferedPaintDC(self, self.buffer, wx.BUFFER_VIRTUAL_AREA)
+
+    def UpdateMapImage(self):
+        self.RenderMapToDC(wx.BufferedDC(None, self.buffer))
+        self.Refresh()
+
     def display_page(self, new_page_obj):
         "Switch to displaying a new page object."
         if new_page_obj != self.page_obj:
             self.page_obj = new_page_obj
-            self.Refresh()
+            self.UpdateMapImage()
 
     def _pos_map2wx(self, x, y):
         "Convert map (x,y) position (lower-left origin) to wx (upper-lefe) as (x,y) tuple"
@@ -145,7 +156,7 @@ class MapCanvas (wx.ScrolledWindow):
         # XXX flip to page?  or is that a higher-level management layer?
         if self.current_location != room_id:
             self.current_location = room_id
-            self.Refresh()
+            self.UpdateMapImage()
 
     def DrawMapAreaFill(self, dc, x, y, w, h, r, g, b):
         "[A,x,y,w,h,r,g,b] -> rectangular area at (x,y) by (w,h) filled in specified color"
@@ -551,8 +562,9 @@ class MapCanvas (wx.ScrolledWindow):
             font_code = font_code.replace('@','')  # we don't recognize this flag
         self.MMap_CurrentFont = (font_code, size)
 
-    def OnPaint(self, evt):
-        dc = wx.PaintDC(self)
+    def RenderMapToDC(self, dc):
+        #dc = wx.PaintDC(self)
+        dc.BeginDrawing()
         dc.Clear()
         dc.SetMapMode(wx.MM_POINTS)
         self.MMap_DarkColour = (.7,.7,.7)
@@ -574,7 +586,9 @@ class MapCanvas (wx.ScrolledWindow):
         #
         # tile image
         #
-        fr_w, fr_h = self.GetClientSizeTuple()
+        #fr_w, fr_h = self.GetClientSizeTuple()
+        fr_w, fr_h = self.GetVirtualSize()
+
         for x in range(0, fr_w, self.bg_w):
             for y in range(0, fr_h, self.bg_h):
                 dc.DrawBitmap(self.bg_tile, x, y, True)
@@ -627,6 +641,7 @@ class MapCanvas (wx.ScrolledWindow):
                         dc.SetPen(self.MMap_CurrentPen)
                         dc.CrossHair(*self._pos_map2wx(*this_room.reference_point))
                         self.SetMapDashPattern(dc)
+        dc.EndDrawing()
 
 
     def _render_map_element_list(self, dc, context, element_list, is_current_location=False):

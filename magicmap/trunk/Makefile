@@ -1,4 +1,5 @@
 DIRLIST=docs man Test lib/RagnarokMUD
+# translate %MAGICMAP_RELEASE% to version number
 
 all: builddocs test
 
