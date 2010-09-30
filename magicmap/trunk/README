@@ -1,5 +1,5 @@
 ______________________________________________________________________________
-Ragnarok MUD Magic Mapper Client 3.0a1 (ALPHA RELEASE) 
+Ragnarok MUD Magic Mapper Client 3.0.0a1 (ALPHA RELEASE) 
 
 This is MagicMapper, a client for playing the Ragnarok MUD game.  It is 
 designed to be simple and flexible, and not tied to any proprietary
@@ -22,7 +22,7 @@ The official documentation for the MagicMapper, both from an end-user
 perspective as well as for developers of the in-game map files and
 compatible clients, is on the Ragnarok technical wiki:
 
-  http://www.rag.com/tech/MagicMapClient
+  http://www.rag.com/tech/tools/viewmap   (the only entry for now)
 
 The files contained in this distribution are arranged as follows:
   dist_bin/*      -- user programs which will be installed in /usr/bin (or

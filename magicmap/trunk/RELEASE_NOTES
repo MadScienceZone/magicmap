@@ -1,5 +1,5 @@
 ______________________________________________________________________________
-Magic Mapper 3.0a1 (ALPHA) "RELEASE_NOTES"
+Magic Mapper 3.0.0a1 (ALPHA) "RELEASE_NOTES"
 
 CONTENTS
   Current Release
@@ -9,7 +9,7 @@ CONTENTS
 
 ______________________________________________________________________________
 CURRENT RELEASE:
-  Magic Mapper 3.0a1 [not yet released]
+  Magic Mapper 3.0.0a1 30-SEP-2010
     **ALPHA TEST RELEASE**
     
     This represents a wholesale reimplementation of major portions
@@ -21,10 +21,12 @@ CURRENT RELEASE:
     Renamed from MSH to MagicMapper but kept advancing the version numbers
     from 2.12 to 3.0 in acknowledgement of its previous history as MSH.
 
-    Bug fixes:
-    Additions:
+    Bug fixes: legion
+    Additions: also legion
 
   KNOWN ISSUES:
+    Not all functions are implemented.  It's fairly easy to confuse with
+    bad or unexpected input files.
 
 ______________________________________________________________________________
 PREVIOUS VERSIONS:
