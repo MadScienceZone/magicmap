@@ -4,11 +4,28 @@ Ragnarok MUD Magic Mapper Client Installation Notes
 Prerequisites:
   Before beginning, check that your system includes the following software.
     * Python 2.6 or later (This application has not been tested for Python 3.x
-      and most likely will not work.)
+      and most likely will not work.) 
+    * WxPython, 2.8.10 or later.
 
-  To install Python, go to http://python.org and download the installation
-  package appropriate for your system.
+  If necessary, download and install these two products first, THEN
+  proceed to install MagicMapper.
       
+______________________________________________________________________________
+BINARY DISTRIBUTIONS
+
+If you want to install a ready-to-run version of MagicMapper, just download
+the appropriate file and run it as if installing that kind of package normally,
+to wit:
+
+  Microsoft Windows:
+	Download: MagicMapper-3.0.0a1.win32.exe
+	Install:  Just run this EXE file and it will install the Magic Mapper
+		  class libraries into your Python installation tree.  The
+		  working programs such as "viewmap.py" will be in your Python
+		  scripts directory (e.g., C:\Python26\scripts\viewmap.py).
+
+
+
 ______________________________________________________________________________
 (1) Unpack the Magic Mapper distribution into a temporary working directory,
     and change to that directory.

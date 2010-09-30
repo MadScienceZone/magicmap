@@ -42,7 +42,7 @@ import imp
 import os.path
 import sys
 
-#@@REL@@sys.tracebacklimit=0
+sys.tracebacklimit=0
 viewmap_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'viewmap')
 
 try:

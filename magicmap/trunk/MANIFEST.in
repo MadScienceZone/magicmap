@@ -2,6 +2,3 @@ include INSTALL
 include LICENSE
 include RELEASE_NOTES
 recursive-include Test *
-recursive-include docs *
-recursive-include man *.[123456789] *.pdf
-recursive-include docs *.pdf *.dvi

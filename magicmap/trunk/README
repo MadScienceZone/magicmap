@@ -29,16 +29,10 @@ The files contained in this distribution are arranged as follows:
                      equivalent location for your system, as appropriate)
   lib/...         -- the class library which will be installed in
                      your Python site_packages directory.
-  man/...         -- documentation for commands, file formats, etc.
-    man5/           -- file format documentation (Unix manpage format)
-    man6/           -- command reference manuals (Unix manpage format)
-    pdf/            -- all of the above (PDF format)
   Test/           -- unit tests for all MagicMapper code
 
   INSTALL         -- notes on how to obtain, install and validate MagicMapper
   LICENSE         -- MagicMapper licensing terms, disclaimer of warranty
-  README          -- this file
-  RELEASE_NOTES   -- changes and issues with this release of MagicMapper
   README          -- this file
   RELEASE_NOTES   -- changes and issues with this release of MagicMapper
 

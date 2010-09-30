@@ -37,7 +37,7 @@ from distutils.core import setup
 
 setup(
     name = 'MagicMapper',
-    version = '3.0a1',
+    version = '3.0.0a1',
     description = 'Ragnarok MUD Mapping Client',
     long_description = '''
         The Magic Mapper client draws a real-time map of your exploration
@@ -49,14 +49,35 @@ setup(
     author_email = 'fizban@rag.com',
     url = 'http://www.rag.com/downloads/MagicMapper',
     packages = [
-        'RagnarokMUD',
         'RagnarokMUD.MagicMapper',
     ],
     scripts = [
-        'dist_bin/magicmapper',
+        'dist_bin/viewmap',
+        'dist_bin/viewmap.py',
     ],
     package_dir = {'': 'lib'},
+    package_data= {'RagnarokMUD.MagicMapper': [
+        'GUI/images/*.png',
+        'GUI/images/*.gif',
+        'GUI/images/*.jpg',
+    ]},
     requires = [
+        'wx (>=2.8.10)',
     ],
     provides = ['RagnarokMUD.MagicMapper'],
+    data_files = [
+        ('', ['LICENSE', 'README', 'RELEASE_NOTES']),
+    ],
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Environment :: Win32 (MS Windows)',
+        'Environment :: MacOS X',
+        'Environment :: X11 Applications',
+        'Intended Audience :: End Users/Desktop',
+        'License :: OSI Approved :: Open Software License (OSL 3.0)',
+        'Natural Language :: English',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python :: 2.6',
+        'Topic :: Games/Entertainment :: Role-Playing',
+    ],
 )

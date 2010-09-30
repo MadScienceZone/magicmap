@@ -34,8 +34,12 @@ import wx
 import optparse
 import platform
 
-# XXX FIXME XXX development hack
-sys.path.append(os.path.join('..','lib'))
+#@@REL@@sys.tracebacklimit=0
+
+#@@BEGIN-DEV:
+#XXX FIXME XXX development hack
+#sys.path.append(os.path.join('..','lib'))
+#:END-DEV@@
 
 from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
 config = ConfigurationManager()
@@ -101,6 +105,7 @@ running it with the --help option.''')
 
 Application = MapPreviewApp(redirect=False)
 Application.MainLoop()
+#@@BEGIN-DEV:
 #
 # Style notes:
 #  1. import wx (not * or wxPython.wx stuff)
@@ -115,3 +120,4 @@ Application.MainLoop()
 #  9. docstrings
 # 10. StdDialogButtonSizer adapts to platform look and feel
 # 
+#:END-DEV@@
