@@ -47,7 +47,7 @@ config = ConfigurationManager()
 from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
 from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
 
-op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='1.0')
+op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.0')
 if platform.system() == 'Windows':
     op.set_defaults(expand_globs=True, pattern='*.map')
 else:

@@ -147,6 +147,8 @@ from RagnarokMUD.MagicMapper.MapPage import MapPage, LANDSCAPE, PORTRAIT, PageOr
 
 DEFAULT_EXIT_LENGTH = 20    # units for exit passages (unless overridden)
 
+class IllegalCreatorReference (Exception): pass
+class InvalidRoomPath (Exception): pass
 class MapFileFormatError (Exception): 
     '''The map source file contains a syntax or other formatting error
     and cannot be processed further.'''
@@ -408,7 +410,7 @@ class MapSource (object):
             yield current_record
 
 
-    def add_from_file(self, input_file, creator=None):
+    def add_from_file(self, input_file, creator=None, enforce_creator=False):
         "Add rooms and places to this file from a map source file."
 
         for record in self._each_record(input_file):
@@ -439,8 +441,66 @@ class MapSource (object):
             if 'orient' in record:
                 page.orient = LANDSCAPE if 'land' in record['orient'] else PORTRAIT
 
-            if record['room'] in self.room_page:
-                raise DuplicateRoomError('Room '+record['room']+' was already defined (on page '+`self.room_page[record['room']]`+')')
+
+            # Sanitize room pathname to /players/<name>/... with no /../
+            # Allowed input forms (all referring to ~<name>/dir/room.c):
+            #   /players/<name>/dir/room    -> players/<name>/dir/room
+            #   ~<name>/dir/room            -> players/<name>/dir/room
+            #   ~/dir/room                  -> players/<name>/dir/room
+            #   dir/room                    -> players/<name>/dir/room
+            # Base map forms (everything else):
+            #   /room/foo                   -> room/foo
+            #    
+            room_name = os.path.normpath(record['room'])
+            room_creator = None
+            #
+            # expand ~ syntax and convert to relative path from mudlib root
+            #
+            m_tilde = re.match(r'~(\w*)/(.*)', room_name)
+            if m_tilde:
+                # ~/...
+                # ~<name>/...
+                if not m_tilde.group(1):
+                    if creator is None:
+                        raise(InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
+                    room_creator = creator
+                else:
+                    room_creator = m_tilde.group(1)
+                    
+                room_name = 'players/'+room_creator+'/'+m_tilde.group(2)
+
+            else:
+                m_player= re.match(r'/players/(\w+)/', room_name)
+                if m_player:
+                    # /players/<name>/...
+                    room_creator = m_player.group(1)
+                    room_name = room_name[1:]
+                elif room_name.startswith('/'):
+                    # /something-other-than-players/...
+                    room_creator = None
+                    room_name = room_name[1:]
+                else:
+                    # relative path in creator's realm
+                    if creator is None:
+                        raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
+                    room_creator = creator
+                    room_name = 'players/'+room_creator+'/'+room_name
+
+            record['room'] = room_name
+            if room_name in self.room_page:
+                raise DuplicateRoomError('Room '+room_name+' was already defined (on page '+`self.room_page[record['room']]`+')')
+
+            if enforce_creator:
+                # Ensure that we don't have user A defining room maps in user B's
+                # realm.
+                # (if path does not match that pattern then it's a base map with
+                # NO creator, which means the creator param must be undefined here)
+                if room_creator != creator:
+                    if creator is None:
+                        raise IllegalCreatorReference('Base maps cannot define rooms inside wizard realms: {0}'.format(room_name))
+                    else:
+                        raise IllegalCreatorReference("Map in {0}'s realm cannot define rooms for {1}'s realm: {2}".format(creator, room_creator, room_name))
+
 
             self.room_page[record['room']] = page.page
             page.add_room(MapRoom(record['room'], page, record.get('name'), 

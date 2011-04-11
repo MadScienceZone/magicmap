@@ -32,14 +32,31 @@ from RagnarokMUD.MagicMapper.MapPage        import MapPage
 from RagnarokMUD.MagicMapper.MapRoom        import MapRoom
 from RagnarokMUD.MagicMapper.MapDataHandler import MapDataHandler
 from RagnarokMUD.MagicMapper.Local          import gen_public_room_id
-import os, os.path, datetime, re
+import os, os.path, datetime, re, sys
 
-def make_world(source_tree, dest_tree, creator_from_path=False):
+def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=False):
     '''Perform the work of compiling MUD-side files to our digested format.
-    The if the optional creator_from_path parameter is True, then the creator
+
+    If the optional creator_from_path parameter is True, then the creator
     list for a page is the list of wizard names whose files are included in
     the page, where the incoming filename is assumed to be of the form:
       .../players/<creator_name>/...
+    or they are base world maps.  IT IS CRITICAL that all user-generated
+    content have ".../players/<creator_name>/..." up front in the path
+    pattern or identity checks will fail.
+
+    THIS ALSO IMPLIES that creator_from_path MUST be set True in order
+    for permissions to be enforced.  In practice, this should ALWAYS
+    be set in production use.
+
+    It is assumed that the directory structure under <dest_tree> is the
+    same as the usual web root for the map (e.g., .../magicmap):
+      <dest_tree>/page/###
+      <dest_tree>/room/a/ab/abfile
+
+    If ignore_errors is set, exceptions raised during operations will be
+    reported but not allowed to stop execution of the overall map (although
+    the realms where errors occurred may be incomplete).
     '''
 
     magic_map = MapSource()
@@ -52,38 +69,58 @@ def make_world(source_tree, dest_tree, creator_from_path=False):
     #
 
     creator_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+r'(\w+)')
-    core_re    = re.compile(re.escape(os.path.sep)+r'room\b')
+    rootdir_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+'\w+$')
+    map_dir_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+'\w+'+re.escape(os.path.sep)+'map('+re.escape(os.path.sep)+'.*)?$')
+    #core_re    = re.compile(re.escape(os.path.sep)+r'room\b')
 
     for root, dirnames, filenames in os.walk(source_tree):
-        for each_dir in os.path.split(root):
-            creator_name = None
-            if creator_from_path:
-                creator_m = creator_re.search(root)
-                if creator_m:
-                    creator_name = creator_m.group(1)
-                elif core_re.search(root):
-                    creator_name = 'Base World Map'
+        #for each_dir in os.path.split(root):
+        # prune to include only ~/realm.map and ~/map/...*.map
+        # and the base "realm.map" (anywhere outside player files)
+        creator_name = None
+        if creator_from_path:
+            creator_m = creator_re.search(root)
+            if creator_m:
+                creator_name = creator_m.group(1)
+                if rootdir_re.search(root):
+                    if 'realm.map' in filenames:
+                        filenames = ['realm.map']
+                    else:
+                        continue
+                elif not map_dir_re.search(root):
+                    continue
+            else:
+                creator_name = 'Base World Map'
 
         for filename in filenames:
             if filename.endswith('.map'):
                 try:
-                    magic_map.add_from_file(open(os.path.join(root, filename)), creator=creator_name)
+                    magic_map.add_from_file(open(os.path.join(root, filename)), creator=creator_name, enforce_creator=True)
                 except Exception, e:
-                    raise MapFileFormatError('Error in %s: %s' % (os.path.join(root, filename), e))
+                    if ignore_errors:
+                        sys.stderr.write('%s: parser error: %s\n' % (os.path.join(root, filename), e))
+                    else:
+                        raise MapFileFormatError('Error in %s: %s' % (os.path.join(root, filename), e))
+#
+# At this point, we have the whole known world map in magic_map.
+# Export this out in the client-readable format to our output
+# directory structure...
+#
+    if not os.path.exists(os.path.join(dest_tree, 'page')):
+        os.makedirs(os.path.join(dest_tree, 'page'))
 
     for page in magic_map.pages.values():
-        if not os.path.exists(os.path.join(dest_tree, 'page')):
-            os.makedirs(os.path.join(dest_tree, 'page'))
-
         with open(os.path.join(dest_tree, 'page', str(page.page)), 'w') as p:
             p.write(translator.dump_page(page, gentime=compile_dtm) + '\n')
+        # XXX suppress if didn't change since last run XXX
         
         for room in page.rooms.values():
             public_room_id = gen_public_room_id(room.id)
             if not public_room_id:
                 raise ValueError('public room ID generated from %s was empty!' % room.id)
-            target_dir = os.path.join(dest_tree, 'room', public_room_id[:1])
+            target_dir = os.path.join(dest_tree, 'room', public_room_id[:1], public_room_id[:2])
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
             with open(os.path.join(target_dir, public_room_id), 'w') as rm:
                 rm.write(translator.dump_room(room, public_id_filter=gen_public_room_id, gentime=compile_dtm) + '\n')
+        # XXX suppress if didn't change since last run XXX

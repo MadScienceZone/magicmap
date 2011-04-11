@@ -60,7 +60,11 @@ from string  import translate, maketrans
 def gen_public_room_id(private_id):
     "Turn private room ID to an obscured but consistent public one."
 
-    return translate(b64encode(md5('5#m,qu3v%'+private_id+'53kreT./.').digest()),
+    return b64encode(md5('5#m,qu3v%'+private_id+'53kreT./.').digest()).translate(
         maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
                   '0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ-abcdefghijklmnopqrstuvwxyz'),
         '=')
+#    return translate(b64encode(md5('5#m,qu3v%'+private_id+'53kreT./.').digest()),
+#        maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
+#                  '0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ-abcdefghijklmnopqrstuvwxyz'),
+#        '=')
