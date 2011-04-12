@@ -141,7 +141,8 @@
 #	\253 Open << quotes
 #	\273 Close >> quotes
 
-import re, math
+import re, math, sys
+import os.path
 from RagnarokMUD.MagicMapper.MapRoom import MapRoom
 from RagnarokMUD.MagicMapper.MapPage import MapPage, LANDSCAPE, PORTRAIT, PageOrientationViolationError
 
@@ -410,8 +411,10 @@ class MapSource (object):
             yield current_record
 
 
-    def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None):
+    def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None, verbosity=0):
         "Add rooms and places to this file from a map source file."
+        if verbosity > 2:
+            sys.stdout.write("MapSource.add_from_file(creator={0}, enforce_creator={1}, source_date={2}, verbosity={3}\n".format(`creator`, enforce_creator, `source_date`, verbosity))
 
         for record in self._each_record(input_file):
             for required_field in 'room', 'page':
@@ -421,6 +424,9 @@ class MapSource (object):
             #
             # set up containing page first
             #
+            if verbosity > 2:
+                sys.stdout.write(" room {0}\n".format(record['room']))
+
             page = self.get_page(record['page'])
 
             if 'bg' in record:
@@ -429,8 +435,6 @@ class MapSource (object):
                     pass
                 page.bg.extend(self.compile(record['bg']))
 
-            if creator is not None and creator not in page.creators:
-                page.creators.append(creator)
 
             if 'realm' in record:
                 if page.realm and record['realm'] != page.realm:
@@ -501,6 +505,11 @@ class MapSource (object):
                     else:
                         raise IllegalCreatorReference("Map in {0}'s realm cannot define rooms for {1}'s realm: {2}".format(creator, room_creator, room_name))
 
+            if room_creator is None:
+                room_creator = "Base World Map"
+
+            if room_creator is not None and room_creator not in page.creators:
+                page.creators.append(room_creator)
 
             self.room_page[record['room']] = page.page
             page.add_room(MapRoom(record['room'], page, record.get('name'), 
@@ -625,6 +634,7 @@ class MapSource (object):
             'sd':       self._ps_setdash,
             'sg':       self._ps_sg,
             'sl':       self._ps_sl,
+            'sf':       self._ps_sf,
             'ss':       self._ps_ss,
             'shadebox': self._ps_shadebox,
             'show':     self._ps_show_text,
@@ -1277,6 +1287,9 @@ class MapSource (object):
     @RequireArgs('sl', 'd')
     def _ps_sl(self):   return ['Fo', self.stack.pop()]
 
+    @RequireArgs('sf', 'd')
+    def _ps_sf(self):   return ['Ff', self.stack.pop()]
+
     @RequireArgs('sg', 'k')
     def _ps_sg(self):
         v = self.stack.pop()
@@ -1628,7 +1641,7 @@ class PostScriptMapSource (MapSource):
 # B x y h w                     box
 # C r g b                       color/bk/gr/wh/sg
 # D [...] offset                sd
-# F[biorstrtT] pts              bf/txtf/rmnf/ss/tt/it/sl
+# F[biorstrtT] pts              bf/txtf/rmnf/ss/tt/it/sl/sf
 # G x y Sx|0 Sy|0 data          DrawGIFImage
 # L w                           lw
 # M[awdop] [x1 y1 ... xn yn]    maze*

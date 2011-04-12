@@ -32,9 +32,9 @@ from RagnarokMUD.MagicMapper.MapPage        import MapPage
 from RagnarokMUD.MagicMapper.MapRoom        import MapRoom
 from RagnarokMUD.MagicMapper.MapDataHandler import MapDataHandler
 from RagnarokMUD.MagicMapper.Local          import gen_public_room_id
-import os, os.path, datetime, re, sys
+import os, os.path, datetime, re, sys, time
 
-def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=False):
+def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=False, verbosity=0):
     '''Perform the work of compiling MUD-side files to our digested format.
 
     If the optional creator_from_path parameter is True, then the creator
@@ -67,6 +67,9 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
     # as your system uses a single path separator string
     # (sorry VMS)
     #
+    if verbosity:
+        sys.stderr.write("MagicMapCompiler.make_world(source_tree={0}, dest_tree={1}, creator_from_path={2}, ignore_errors={3}, verbosity={4})\n".format(`source_tree`, `dest_tree`, `creator_from_path`, `ignore_errors`, `verbosity`))
+        sys.stderr.write("compile_dtm={0}\n".format(compile_dtm))
 
     creator_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+r'(\w+)')
     rootdir_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+'\w+$')
@@ -86,24 +89,36 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
                     if 'realm.map' in filenames:
                         filenames = ['realm.map']
                     else:
+                        if verbosity > 2:
+                            sys.stderr.write("Skipping "+root+"\n")
                         continue
                 elif not map_dir_re.search(root):
+                    if verbosity > 2:
+                        sys.stderr.write("Skipping "+root+"\n")
                     continue
-            else:
-                creator_name = 'Base World Map'
+        #    else:
+        #        creator_name = 'Base World Map'
+
+        if verbosity>1:
+            sys.stderr.write("Scanning {0}, creator={1}\n".format(root, creator_name))
 
         for filename in filenames:
             if filename.endswith('.map'):
+                if verbosity:
+                    sys.stderr.write("   "+filename+"\n")
                 try:
                     src_filename = os.path.join(root, filename)
                     magic_map.add_from_file(open(src_filename), 
                             creator=creator_name, enforce_creator=True, 
-                            source_date=datetime.utcfromtimestamp(os.stat(src_filename).st_mtime))
+                            source_date=datetime.datetime.utcfromtimestamp(os.stat(src_filename).st_mtime),
+                            verbosity=verbosity)
                 except Exception, e:
                     if ignore_errors:
                         sys.stderr.write('%s: parser error: %s\n' % (src_filename, e))
                     else:
                         raise MapFileFormatError('Error in %s: %s' % (src_filename, e))
+            elif verbosity > 2:
+                sys.stderr.write("   (Skipping {0})\n".format(filename))
 #
 # At this point, we have the whole known world map in magic_map.
 # Export this out in the client-readable format to our output
@@ -128,7 +143,7 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
             target_name = os.path.join(target_dir, public_room_id)
             if os.path.exists(target_name) and room.source_modified_date:
                 # don't overwrite if we have nothing new to do
-                if datetime.utcfromtimestamp(os.stat(target_name).st_mtime) >= room.source_modified_date:
+                if datetime.datetime.utcfromtimestamp(os.stat(target_name).st_mtime) >= room.source_modified_date:
                     continue
 
             with open(target_name, 'w') as rm:
