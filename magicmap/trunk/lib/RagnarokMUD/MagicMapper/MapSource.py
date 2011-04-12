@@ -4,7 +4,7 @@
 # RAGNAROK MAGIC MAPPER SOURCE CODE: MUD-side map source file handling
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2011 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.
@@ -166,6 +166,18 @@ class NoProcedureRunning (Exception):
 class InfiniteLoopError (Exception):
     "The road goes on and on and on and on and on and on and..."
 
+class MapDefSymbol (object):
+    "The name of a defined symbol"
+
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return "<<MapDefSymbol /{0}>>".format(self.name)
+
+    def __str__(self):
+        return "/"+self.name
+
 class RoomAttributes (object):
     "Get and then clear pending room flag bits, pass to function"
     def __init__(self, f):
@@ -226,6 +238,7 @@ class RequireArgs (object):
       'p' array of coordinate pairs (list/tuple of even number of 'c' values)
       's' string value (string object)
       'x' executable block of code (list of tokens to be re-scanned by compiler)
+      '/' the name of a symbol
       '''
 
     def __init__(self, f_name, prototype):
@@ -246,6 +259,11 @@ class RequireArgs (object):
                     raise MapFileFormatError('map definition command "'+self.f_name+'" given insufficient parameters.')
 
                 for idx, check in enumerate(zip(self.prototype, f_self.stack[-len(self.prototype):])):
+                    if check[0] == '/': #symbol name
+                        if not isinstance(check[1], MapDefSymbol):
+                            raise MapFileFormatError('map definition command "%s", parameter #%d, symbol name expected (got "%s")' %
+                                    (self.f_name, idx+1, check[1]))
+
                     if check[0] == 'c': #coordinate value
                         if not isinstance(check[1], (float, int)):
                             raise MapFileFormatError('map definition command "%s", parameter #%d, coordinate value expected (got "%s")' %
@@ -343,6 +361,7 @@ class MapSource (object):
 
         self.pages = {}
         self.room_page = {}
+        self.realm_globals = {}
         if file is not None:
             self.add_from_file(file)
 
@@ -416,6 +435,10 @@ class MapSource (object):
         if verbosity > 2:
             sys.stdout.write("MapSource.add_from_file(creator={0}, enforce_creator={1}, source_date={2}, verbosity={3}\n".format(`creator`, enforce_creator, `source_date`, verbosity))
 
+        global_key = creator or '.CORE.'
+        if global_key not in self.realm_globals:
+            self.realm_globals[global_key] = {}
+
         for record in self._each_record(input_file):
             for required_field in 'room', 'page':
                 if required_field not in record:
@@ -433,7 +456,7 @@ class MapSource (object):
                 if page.bg:
                     # XXX warn that multiple rooms contribute to this page bg
                     pass
-                page.bg.extend(self.compile(record['bg']))
+                page.bg.extend(self.compile(record['bg']), global_symbols=self.realm_globals[global_key])
 
 
             if 'realm' in record:
@@ -513,7 +536,8 @@ class MapSource (object):
 
             self.room_page[record['room']] = page.page
             page.add_room(MapRoom(record['room'], page, record.get('name'), 
-                self.compile(record['map']) if 'map' in record else None,
+                self.compile(record['map'], global_symbols=self.realm_globals[global_key])
+                    if 'map' in record else None,
                 record.get('also','').split('\n'),
                 reference_point=record.get('ref'),
                 source_modified_date=source_date))
@@ -526,8 +550,8 @@ class MapSource (object):
             self.pages[i] = MapPage(i)
         return self.pages[i]
 
-    def compile(self, source, allow_test=False):
-        "Compile source string -> list of encoded element definitions"
+    def compile(self, source, allow_test=False, global_symbols=None):
+        "Compile source string -> list of encoded element definitions  **NOT REENTRANT**"
         object = []
         self.stack = []
         self.room_flags = set()
@@ -542,6 +566,8 @@ class MapSource (object):
         self.last_drawing_mode_list = None
         self.last_drawing_flags = set()
         self._start_tokenizer()
+        self._global_symbols = global_symbols or {}
+        self._local_symbols = {}
 
         #
         # The source used to be PostScript commands.  We keep the same
@@ -684,6 +710,7 @@ class MapSource (object):
             'if':       self._do_if,
             'ifelse':   self._do_ifelse,
             'repeat':   self._do_repeat,
+            'def':      self._do_def,
             'loop':     self._do_loop,
             'exit':     self._do_exit,
             'for':      self._do_for,
@@ -870,6 +897,12 @@ class MapSource (object):
                     object.append(['P'+''.join(sorted(list(self.drawing_flags) + type_flags)), list(end_point + starting_point)])
                     self.current_point = starting_point
 
+            elif ps_token.startswith('/'):
+                self.stack.append(MapDefSymbol(ps_token[1:]))
+            elif ps_token.startswith('$') and ps_token in self._global_symbols:
+                self._tokenizer_push(self._global_symbols[ps_token])
+            elif ps_token in self._local_symbols:
+                self._tokenizer_push(self._local_symbols[ps_token])
             else:
                 raise MapFileFormatError('Unrecognized map drawing command "'+ ps_token + '".')
 
@@ -1019,6 +1052,15 @@ class MapSource (object):
         condition = bool(self.stack.pop())
         if condition:
             self._tokenizer_push(body)
+
+    @RequireArgs('def', '/x')
+    def _do_def(self):
+        body = self.stack.pop()
+        name = self.stack.pop()
+        if name.startswith('$'):
+            self._global_symbols[name] = body
+        else:
+            self._local_symbols[name] = body
 
     @RequireArgs('ifelse', 'bxx')
     def _do_ifelse(self):
