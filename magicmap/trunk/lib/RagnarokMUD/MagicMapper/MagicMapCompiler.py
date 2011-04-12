@@ -95,12 +95,15 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
         for filename in filenames:
             if filename.endswith('.map'):
                 try:
-                    magic_map.add_from_file(open(os.path.join(root, filename)), creator=creator_name, enforce_creator=True)
+                    src_filename = os.path.join(root, filename)
+                    magic_map.add_from_file(open(src_filename), 
+                            creator=creator_name, enforce_creator=True, 
+                            source_date=datetime.utcfromtimestamp(os.stat(src_filename).st_mtime))
                 except Exception, e:
                     if ignore_errors:
-                        sys.stderr.write('%s: parser error: %s\n' % (os.path.join(root, filename), e))
+                        sys.stderr.write('%s: parser error: %s\n' % (src_filename, e))
                     else:
-                        raise MapFileFormatError('Error in %s: %s' % (os.path.join(root, filename), e))
+                        raise MapFileFormatError('Error in %s: %s' % (src_filename, e))
 #
 # At this point, we have the whole known world map in magic_map.
 # Export this out in the client-readable format to our output
@@ -121,6 +124,16 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
             target_dir = os.path.join(dest_tree, 'room', public_room_id[:1], public_room_id[:2])
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
-            with open(os.path.join(target_dir, public_room_id), 'w') as rm:
+
+            target_name = os.path.join(target_dir, public_room_id)
+            if os.path.exists(target_name) and room.source_modified_date:
+                # don't overwrite if we have nothing new to do
+                if datetime.utcfromtimestamp(os.stat(target_name).st_mtime) >= room.source_modified_date:
+                    continue
+
+            with open(target_name, 'w') as rm:
                 rm.write(translator.dump_room(room, public_id_filter=gen_public_room_id, gentime=compile_dtm) + '\n')
-        # XXX suppress if didn't change since last run XXX
+            if room.source_modified_date:
+                #match the source's timestamp
+                os.utime(target_name, 
+                        (time.time(), time.mktime(room.source_modified_date.utctimetuple())))

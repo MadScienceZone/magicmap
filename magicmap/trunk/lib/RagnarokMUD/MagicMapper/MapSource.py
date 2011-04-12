@@ -410,7 +410,7 @@ class MapSource (object):
             yield current_record
 
 
-    def add_from_file(self, input_file, creator=None, enforce_creator=False):
+    def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None):
         "Add rooms and places to this file from a map source file."
 
         for record in self._each_record(input_file):
@@ -462,7 +462,7 @@ class MapSource (object):
                 # ~<name>/...
                 if not m_tilde.group(1):
                     if creator is None:
-                        raise(InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
+                        raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
                     room_creator = creator
                 else:
                     room_creator = m_tilde.group(1)
@@ -506,7 +506,8 @@ class MapSource (object):
             page.add_room(MapRoom(record['room'], page, record.get('name'), 
                 self.compile(record['map']) if 'map' in record else None,
                 record.get('also','').split('\n'),
-                reference_point=record.get('ref')))
+                reference_point=record.get('ref'),
+                source_modified_date=source_date))
 
     def get_page(self, page_id):
         "Get page by id (coerced to integer) and return it (creating one if needed)"
