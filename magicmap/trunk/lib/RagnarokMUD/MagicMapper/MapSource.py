@@ -711,6 +711,8 @@ class MapSource (object):
             'ifelse':   self._do_ifelse,
             'repeat':   self._do_repeat,
             'def':      self._do_def,
+            'sdef':     self._do_sdef,
+            'ndef':     self._do_ndef,
             'loop':     self._do_loop,
             'exit':     self._do_exit,
             'for':      self._do_for,
@@ -1053,14 +1055,24 @@ class MapSource (object):
         if condition:
             self._tokenizer_push(body)
 
-    @RequireArgs('def', '/x')
-    def _do_def(self):
-        body = self.stack.pop()
+    def _pop_store_sym(self, v):
         name = self.stack.pop()
         if name.startswith('$'):
-            self._global_symbols[name] = body
+            self._global_symbols[name] = v
         else:
-            self._local_symbols[name] = body
+            self._local_symbols[name] = v
+        
+    @RequireArgs('def', '/x')
+    def _do_def(self):
+        self._pop_store_sym(self.stack.pop())
+
+    @RequireArgs('sdef', '/s')
+    def _do_sdef(self):
+        self._pop_store_sym(self.stack.pop())
+
+    @RequireArgs('ndef', '/f')
+    def _do_ndef(self):
+        self._pop_store_sym(self.stack.pop())
 
     @RequireArgs('ifelse', 'bxx')
     def _do_ifelse(self):

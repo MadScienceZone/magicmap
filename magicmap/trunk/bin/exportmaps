@@ -40,7 +40,7 @@ import itertools
 
 #@@BEGIN-DEV:
 #XXX FIXME XXX development hack
-#sys.path.append(os.path.join('..','lib'))
+sys.path.append(os.path.join('..','lib'))
 #:END-DEV@@
 
 from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
