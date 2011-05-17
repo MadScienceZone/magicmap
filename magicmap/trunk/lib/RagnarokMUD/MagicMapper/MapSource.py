@@ -264,7 +264,7 @@ class RequireArgs (object):
                             raise MapFileFormatError('map definition command "%s", parameter #%d, symbol name expected (got "%s")' %
                                     (self.f_name, idx+1, check[1]))
 
-                    if check[0] == 'c': #coordinate value
+                    elif check[0] == 'c': #coordinate value
                         if not isinstance(check[1], (float, int)):
                             raise MapFileFormatError('map definition command "%s", parameter #%d, coordinate value expected (got "%s")' %
                                     (self.f_name, idx+1, check[1]))
@@ -456,7 +456,7 @@ class MapSource (object):
                 if page.bg:
                     # XXX warn that multiple rooms contribute to this page bg
                     pass
-                page.bg.extend(self.compile(record['bg']), global_symbols=self.realm_globals[global_key])
+                page.bg.extend(self.compile(record['bg'], global_symbols=self.realm_globals[global_key]))
 
 
             if 'realm' in record:
@@ -1061,17 +1061,17 @@ class MapSource (object):
             self._global_symbols[name] = v
         else:
             self._local_symbols[name] = v
-        
+
     @RequireArgs('def', '/x')
     def _do_def(self):
         self._pop_store_sym(self.stack.pop())
 
     @RequireArgs('sdef', '/s')
-    def _do_sdef(self):
+    def _do_def(self):
         self._pop_store_sym(self.stack.pop())
 
     @RequireArgs('ndef', '/f')
-    def _do_ndef(self):
+    def _do_def(self):
         self._pop_store_sym(self.stack.pop())
 
     @RequireArgs('ifelse', 'bxx')

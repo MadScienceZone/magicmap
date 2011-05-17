@@ -30,7 +30,7 @@
 
 import sys
 import os, os.path
-import wx
+#import wx
 import optparse
 import platform
 import glob
@@ -48,7 +48,8 @@ import RagnarokMUD.MagicMapper.MagicMapCompiler
 
 config = ConfigurationManager()
 
-op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.0')
+#op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.0')
+op = optparse.OptionParser(usage='%prog [-ghIv] mapfiles...', version='6.0')
 if platform.system() == 'Windows':
     op.set_defaults(expand_globs=True, pattern='*.map', dest_dir="maproot")
 else:
@@ -68,4 +69,4 @@ if opt.expand_globs:
     cmd_map_file_list = list(itertools.chain(*[glob.glob(pattern) for pattern in cmd_map_file_list]))
 
 for dir_name in cmd_map_file_list:
-    RagnarokMUD.MagicMapper.MagicMapCompiler.make_world(dir_name, opt.dest_dir, True, opt.ignore_errors)
+    RagnarokMUD.MagicMapper.MagicMapCompiler.make_world(dir_name, opt.dest_dir, True, opt.ignore_errors, verbosity=opt.verbose)
