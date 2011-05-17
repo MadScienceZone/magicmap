@@ -1057,7 +1057,7 @@ class MapSource (object):
 
     def _pop_store_sym(self, v):
         name = self.stack.pop()
-        if name.startswith('$'):
+        if name.name.startswith('$'):
             self._global_symbols[name] = v
         else:
             self._local_symbols[name] = v
