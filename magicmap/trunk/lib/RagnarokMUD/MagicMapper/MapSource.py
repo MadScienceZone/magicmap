@@ -1067,11 +1067,11 @@ class MapSource (object):
         self._pop_store_sym(self.stack.pop())
 
     @RequireArgs('sdef', '/s')
-    def _do_def(self):
+    def _do_sdef(self):
         self._pop_store_sym(self.stack.pop())
 
     @RequireArgs('ndef', '/f')
-    def _do_def(self):
+    def _do_ndef(self):
         self._pop_store_sym(self.stack.pop())
 
     @RequireArgs('ifelse', 'bxx')
