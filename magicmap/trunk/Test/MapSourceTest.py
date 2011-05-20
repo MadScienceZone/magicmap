@@ -31,7 +31,7 @@ import unittest
 import StringIO
 
 import RagnarokMUD.MagicMapper.MapPage
-from RagnarokMUD.MagicMapper.MapSource import MapSource, MapFileFormatError, DuplicateRoomError, InfiniteLoopError
+from RagnarokMUD.MagicMapper.MapSource import MapSource, MapFileFormatError, DuplicateRoomError, InfiniteLoopError, InvalidRoomPath, IllegalCreatorReference, MapDefSymbol
 
 class MapSourceTest (unittest.TestCase):
     def test_ps_tokenizer(self):
@@ -87,6 +87,20 @@ class MapSourceTest (unittest.TestCase):
         "Given a list of (source, expected_result_list) tuples, try compiling each one and comparing the resulting list from the compiler with the expected value."
         for source, expected in se_list:
             self.failUnlessEqual(self.ms.compile(source, allow_test=True), expected)
+
+    def _test_compiler_symbols(self, se_list, persistent=False):
+        "Given a list of (source, expected_result_list, locals, globals) tuples, try compiling each one and comparing the resulting list from the compiler, as well as testing the resulting dictionaries of local and global symbols."
+        myglobs = {}
+        for source, expected, localdict, globaldict in se_list:
+            if not persistent:
+                myglobs = {}
+            res = self.ms.compile(source, allow_test=True, global_symbols=myglobs)
+            self.assertEqual(res, expected, msg="result of {0} was {1}, expected {2}".format(
+                source, res, expected))
+            self.assertEqual(self.ms._local_symbols, localdict, msg="{0}: locals {1}, expected {2}".format(
+                source, self.ms._local_symbols, localdict))
+            self.assertEqual(myglobs, globaldict, msg="{0}: globals {1}, expected {2}".format(
+                source, myglobs, globaldict))
 
     def _test_float_lists(self, a, x, msg):
         "Recursively test float values"
@@ -398,48 +412,122 @@ realm: note no page number
 ''')
         self.assertRaises(MapFileFormatError, MapSource, f)
 
+    def test_relative_path_with_no_creator(self):
+        for name in 'relative-name', 'relative/path', '~/twiddle_path':
+            self.assertRaises(InvalidRoomPath, MapSource, StringIO.StringIO('''
+room: '''+name+'''
+page: 1
+'''))
+
+    def test_normalized_paths(self):
+        for a,b in (
+            ('/foo//bar//baz', 'foo/bar/baz'),
+            ('/players/x/../a/b/c/../d', 'players/a/b/d')
+        ):
+            ms = MapSource(StringIO.StringIO('''
+room: '''+a+'''
+page: 12
+'''))
+            self.assert_(b in ms.room_page, msg="{0} translated to {1} not {2}".format(
+                a, ms.room_page.keys(), b))
+
+    def test_relative_path_with_creator(self):
+        for a,b in (
+            ('relative-name', 'players/me/relative-name'),
+            ('relative/path', 'players/me/relative/path'),
+            ('~/twiddle_path','players/me/twiddle_path'),
+            ('~me/twiddle_path','players/me/twiddle_path'),
+            ('~them/twiddle_path','players/them/twiddle_path'),
+            ('/absolute/path/to/file','absolute/path/to/file'),
+        ):
+            ms = MapSource()
+            ms.add_from_file(StringIO.StringIO('''
+room: '''+a+'''
+page: 1
+'''), creator='me', enforce_creator=False)
+            self.assert_(b in ms.pages[1].rooms, msg="{0} didn't translate to {1}, got {2}".format(a,b,ms.pages[1].rooms.keys()))
+            
+    def test_cross_realm_definition(self):
+        for name in (
+            '/players/aaa/path',
+            '~aaa/path',
+            '/room/base/path',
+        ):
+            ms = MapSource()
+            self.assertRaises(IllegalCreatorReference, ms.add_from_file, StringIO.StringIO('''
+room: '''+name+'''
+page: 2
+'''), creator='bbb', enforce_creator=True)
+
+    def test_base_realm_definition(self):
+        for name in (
+            '/players/aaa/path',
+            '~aaa/path',
+        ):
+            ms = MapSource()
+            self.assertRaises(IllegalCreatorReference, ms.add_from_file, StringIO.StringIO('''
+room: '''+name+'''
+page: 2
+'''), creator=None, enforce_creator=True)
+
+    def test_realm_creator(self):
+        for name, cname in (
+            ('/players/aaa/path', 'aaa'),
+            ('/players/bbb/path', 'bbb'),
+            ('~ccc/path', 'ccc'),
+            ('/room/foo/bar', 'Base World Map'),
+        ):
+            ms = MapSource(StringIO.StringIO('''
+room: '''+name+'''
+page: 34
+'''))
+            self.assertEqual(ms.pages[34].creators[0], cname,
+                msg="{0} creator(s) {1}, expected {2}".format(
+                    name, ms.pages[34].creators, cname))
+
+
     def test_duplicate_room(self):
         self.assertRaises(DuplicateRoomError, MapSource, StringIO.StringIO('''
-room: one
+room: ~x/one
 page: 1
 
-room: one
+room: ~x/one
 page: 2
 '''))
 
     def test_reference_point_explicit(self):
         self.assertEquals(MapSource(StringIO.StringIO('''
-room: one
+room: ~x/one
 page: 1
 ref:  123 456
 map:  (foo)(bar)111 222 std room
-''')).pages[1].rooms['one'].reference_point, (123, 456))
+''')).pages[1].rooms['players/x/one'].reference_point, (123, 456))
 
     def test_reference_point_room(self):
         self.assertEquals(MapSource(StringIO.StringIO('''
-room: one
+room: ~x/one
 page: 1
 map:  (foo)(bar)100 200 std room
       (aaa)(bbb)333 444 std room
       555 666 2 dotmark
-''')).pages[1].rooms['one'].reference_point, (125, 210))
+''')).pages[1].rooms['players/x/one'].reference_point, (125, 210))
 
     def test_reference_point_round(self):
         self.assertEquals(MapSource(StringIO.StringIO('''
-room: one
+room: ~x/one
 page: 1
 map:  (foo)(bar)100 200 stdr round-room
       (aaa)(bbb)333 444 std room
       555 666 2 dotmark
-''')).pages[1].rooms['one'].reference_point, (100, 200))
+''')).pages[1].rooms['players/x/one'].reference_point, (100, 200))
 
     def test_reference_point_dot(self):
         self.assertEquals(MapSource(StringIO.StringIO('''
-room: one
+room: ~x/one
 page: 1
 map:  [1 2 3 4 5 6 7 8] mazeroom
       555 666 2 dotmark
-''')).pages[1].rooms['one'].reference_point, (555,666))
+''')).pages[1].rooms['players/x/one'].reference_point, (555,666))
 
     def test_get_page(self):
         ms = MapSource()
@@ -474,26 +562,26 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
         self.assertEquals(ms.pages[20].realm, "Aardvark's Museum--Gateway to Adventureland")
         self.assertEquals(ms.pages[5].realm, None)
 
-        self.assertEquals(sorted(ms.pages[5].rooms.keys()), ['/players/fizban/aardvark/entrance'])
+        self.assertEquals(sorted(ms.pages[5].rooms.keys()), ['players/fizban/aardvark/entrance'])
         self.assertEquals(sorted(ms.pages[20].rooms.keys()), [
-            '/players/fizban/aardvark/china',
-            '/players/fizban/aardvark/egypt',
-            '/players/fizban/aardvark/india',
-            '/players/fizban/aardvark/prehistory',
-            '/players/fizban/aardvark/proto-south',
-            '/players/fizban/aardvark/rotunda',
+            'players/fizban/aardvark/china',
+            'players/fizban/aardvark/egypt',
+            'players/fizban/aardvark/india',
+            'players/fizban/aardvark/prehistory',
+            'players/fizban/aardvark/proto-south',
+            'players/fizban/aardvark/rotunda',
             ])
 
-        self.assertEquals(ms.room_page['/players/fizban/aardvark/entrance'], 5)
-        self.assertEquals(ms.room_page['/players/fizban/aardvark/egypt'], 20)
-        entrance = ms.pages[5].rooms['/players/fizban/aardvark/entrance']
+        self.assertEquals(ms.room_page['players/fizban/aardvark/entrance'], 5)
+        self.assertEquals(ms.room_page['players/fizban/aardvark/egypt'], 20)
+        entrance = ms.pages[5].rooms['players/fizban/aardvark/entrance']
         self.assertEquals(entrance.map, [
             ['Rp', 380, 430, 50, 20, 'Museum', 'Entrance', [['e', 20]]],
             ['S', 385, 420, '(See p. 20)']
         ])
         self.assertEquals(entrance.page.page, 5)
 
-        rotunda = ms.pages[20].rooms['/players/fizban/aardvark/rotunda']
+        rotunda = ms.pages[20].rooms['players/fizban/aardvark/rotunda']
         self.assertEquals(rotunda.page.page, 20)
         self.assertEquals(rotunda.page.realm, "Aardvark's Museum--Gateway to Adventureland")
         self.assertEquals(rotunda.map, [
@@ -776,8 +864,48 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
         for src in ('np 4 3 lineto stroke', 'np 4 3 rlineto stroke'):
             self.failUnlessRaises(MapFileFormatError, self.ms.compile, src)
 
+    def test_symbol_name(self):
+        self._test_compiler((
+            ('/foo { 1 2 3 add sub } 2 __test__', [['_T', MapDefSymbol('foo'), [1, 2, 3, 'add', 'sub']]]),
+            ('/$bar { /i 1 ndef } 2 __test__',    [['_T', MapDefSymbol('$bar'), ['/i', 1, 'ndef']]]),
+        ))
+
+    def test_def_proc(self):
+        self._test_compiler_symbols((
+            ('/foo { 1 2 3 add add } def', [], {'foo': [1,2,3,'add','add']}, {}),
+            ('/i 10 ndef i 1 __test__', [['_T', 10]], {'i': 10}, {}),
+            ('/$i 20 ndef /i 1 ndef $i i add 1 __test__', [['_T', 21]], {'i': 1}, {'$i': 20}),
+        ))
+
+    def test_persistent_globals(self):
+        self._test_compiler_symbols((
+            ('/foo { 1 2 3 add add } def', [], {'foo': [1,2,3,'add','add']}, {}),
+            ('/i 10 ndef i 1 __test__', [['_T', 10]], {'i': 10}, {}),
+            ('/$i 20 ndef /i 1 ndef $i i add 1 __test__', [['_T', 21]], {'i': 1}, {'$i': 20}),
+            ('/$j 30 ndef /i 1 ndef $i i add 1 __test__', [['_T', 21]], {'i': 1}, {'$i': 20, '$j': 30}),
+            ('/$j (xxx) sdef /k 1 ndef $i k add 1 __test__', [['_T', 21]], {'k': 1}, {'$i': 20, '$j': 'xxx'}),
+            ('/$SQUARE { dup mul } def', [], {}, {'$i': 20, '$j': 'xxx', '$SQUARE': ['dup', 'mul']}),
+            ('15 $SQUARE 6 $SQUARE 2 __test__', [['_T', 15**2, 36]], {}, {'$i': 20, '$j': 'xxx', '$SQUARE': ['dup', 'mul']}),
+        ), persistent=True)
+
+    def test_def_type_mismatch(self):
+        for src in (
+            '/$eric (half a string) def',
+            '/$eric 42 def',
+            '/$eric {1 2 3} ndef',
+            '/$eric (hello) ndef',
+            '/$eric {1 2 3} sdef',
+            '/$eric 444 sdef',
+            '/eric (half a string) def',
+            '/eric 42 def',
+            '/eric {1 2 3} ndef',
+            '/eric (hello) ndef',
+            '/eric {1 2 3} sdef',
+            '/eric 444 sdef',
+            '$undefined',
+        ):
+            self.failUnlessRaises(MapFileFormatError, self.ms.compile, src)
+
 # TODO
-#   Scan ~/map/... and /room/map/...
-#   Check that room field doesn't impersonate another realm!
 #   arc[n]
 #   effects of start>end and end more than a full circle away from start

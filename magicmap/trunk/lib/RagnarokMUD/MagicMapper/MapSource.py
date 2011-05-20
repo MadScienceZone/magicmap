@@ -178,6 +178,9 @@ class MapDefSymbol (object):
     def __str__(self):
         return "/"+self.name
 
+    def __eq__(self, a):
+        return a.name == self.name
+
 class RoomAttributes (object):
     "Get and then clear pending room flag bits, pass to function"
     def __init__(self, f):
@@ -429,8 +432,63 @@ class MapSource (object):
         if current_record:
             yield current_record
 
+    def _normalize_room_path(self, path, creator=None):
+        """Normalize the pathanme to the room, dealing with ~ syntax, etc.
+        creator is the expected creator name (to expand for ~/)
+        The normalized name should be the same as what the mudlib would
+        represnt it as (which is very important!)
+        NOTE THAT OUR DRIVER RUNS IN COMPAT MODE so these paths are
+        relative to the root dir ("players/<name>", "room/<name>", etc.)
 
-    def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None, verbosity=0):
+        Returns a tuple (normalized_name, creator_name)"""
+
+        # Sanitize room pathname to /players/<name>/... with no /../
+        # Allowed input forms (all referring to ~<name>/dir/room.c):
+        #   /players/<name>/dir/room    -> players/<name>/dir/room
+        #   ~<name>/dir/room            -> players/<name>/dir/room
+        #   ~/dir/room                  -> players/<name>/dir/room
+        #   dir/room                    -> players/<name>/dir/room
+        # Base map forms (everything else):
+        #   /room/foo                   -> room/foo
+        #    
+        # XXX This will likely only work on Unix systems!
+        room_name = os.path.normpath(path.strip())
+        room_creator = None
+        #
+        # expand ~ syntax and convert to relative path from mudlib root
+        #
+        m_tilde = re.match(r'~(\w*)/(.*)', room_name)
+        if m_tilde:
+            # ~/...
+            # ~<name>/...
+            if not m_tilde.group(1):
+                if creator is None:
+                    raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
+                room_creator = creator
+            else:
+                room_creator = m_tilde.group(1)
+                
+            room_name = 'players/'+room_creator+'/'+m_tilde.group(2)
+        else:
+            m_player= re.match(r'/players/(\w+)/', room_name)
+            if m_player:
+                # /players/<name>/...
+                room_creator = m_player.group(1)
+                room_name = room_name[1:]
+            elif room_name.startswith('/'):
+                # /something-other-than-players/...
+                room_creator = None
+                room_name = room_name[1:]
+            else:
+                # relative path in creator's realm
+                if creator is None:
+                    raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
+                room_creator = creator
+                room_name = 'players/'+room_creator+'/'+room_name
+
+        return (room_name, room_creator)
+
+    def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None, verbosity=5):
         "Add rooms and places to this file from a map source file."
         if verbosity > 2:
             sys.stdout.write("MapSource.add_from_file(creator={0}, enforce_creator={1}, source_date={2}, verbosity={3}\n".format(`creator`, enforce_creator, `source_date`, verbosity))
@@ -468,54 +526,12 @@ class MapSource (object):
             if 'orient' in record:
                 page.orient = LANDSCAPE if 'land' in record['orient'] else PORTRAIT
 
-
-            # Sanitize room pathname to /players/<name>/... with no /../
-            # Allowed input forms (all referring to ~<name>/dir/room.c):
-            #   /players/<name>/dir/room    -> players/<name>/dir/room
-            #   ~<name>/dir/room            -> players/<name>/dir/room
-            #   ~/dir/room                  -> players/<name>/dir/room
-            #   dir/room                    -> players/<name>/dir/room
-            # Base map forms (everything else):
-            #   /room/foo                   -> room/foo
-            #    
-            room_name = os.path.normpath(record['room'])
-            room_creator = None
-            #
-            # expand ~ syntax and convert to relative path from mudlib root
-            #
-            m_tilde = re.match(r'~(\w*)/(.*)', room_name)
-            if m_tilde:
-                # ~/...
-                # ~<name>/...
-                if not m_tilde.group(1):
-                    if creator is None:
-                        raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
-                    room_creator = creator
-                else:
-                    room_creator = m_tilde.group(1)
-                    
-                room_name = 'players/'+room_creator+'/'+m_tilde.group(2)
-
-            else:
-                m_player= re.match(r'/players/(\w+)/', room_name)
-                if m_player:
-                    # /players/<name>/...
-                    room_creator = m_player.group(1)
-                    room_name = room_name[1:]
-                elif room_name.startswith('/'):
-                    # /something-other-than-players/...
-                    room_creator = None
-                    room_name = room_name[1:]
-                else:
-                    # relative path in creator's realm
-                    if creator is None:
-                        raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
-                    room_creator = creator
-                    room_name = 'players/'+room_creator+'/'+room_name
-
-            record['room'] = room_name
+            room_name, room_creator = self._normalize_room_path(record['room'], creator)
+            if verbosity > 3:
+                sys.stderr.write("room normalization {0} -> {1} (creator {2} -> {3})\n".format(
+                    record['room'], room_name, creator, room_creator))
             if room_name in self.room_page:
-                raise DuplicateRoomError('Room '+room_name+' was already defined (on page '+`self.room_page[record['room']]`+')')
+                raise DuplicateRoomError('Room '+room_name+' was already defined (on page '+`self.room_page[room_name]`+')')
 
             if enforce_creator:
                 # Ensure that we don't have user A defining room maps in user B's
@@ -534,11 +550,12 @@ class MapSource (object):
             if room_creator is not None and room_creator not in page.creators:
                 page.creators.append(room_creator)
 
-            self.room_page[record['room']] = page.page
-            page.add_room(MapRoom(record['room'], page, record.get('name'), 
+            self.room_page[room_name] = page.page
+            page.add_room(MapRoom(room_name, page, record.get('name'), 
                 self.compile(record['map'], global_symbols=self.realm_globals[global_key])
                     if 'map' in record else None,
-                record.get('also','').split('\n'),
+                [self._normalize_room_path(p, creator)[0] 
+                    for p in filter(None, record.get('also','').split('\n'))],
                 reference_point=record.get('ref'),
                 source_modified_date=source_date))
 
@@ -566,7 +583,7 @@ class MapSource (object):
         self.last_drawing_mode_list = None
         self.last_drawing_flags = set()
         self._start_tokenizer()
-        self._global_symbols = global_symbols or {}
+        self._global_symbols = global_symbols if global_symbols is not None else {}
         self._local_symbols = {}
 
         #
@@ -902,9 +919,15 @@ class MapSource (object):
             elif ps_token.startswith('/'):
                 self.stack.append(MapDefSymbol(ps_token[1:]))
             elif ps_token.startswith('$') and ps_token in self._global_symbols:
-                self._tokenizer_push(self._global_symbols[ps_token])
+                if isinstance(self._global_symbols[ps_token], (str,int,float)):
+                    self.stack.append(self._global_symbols[ps_token])
+                else:
+                    self._tokenizer_push(self._global_symbols[ps_token])
             elif ps_token in self._local_symbols:
-                self._tokenizer_push(self._local_symbols[ps_token])
+                if isinstance(self._local_symbols[ps_token], (str,int,float)):
+                    self.stack.append(self._local_symbols[ps_token])
+                else:
+                    self._tokenizer_push(self._local_symbols[ps_token])
             else:
                 raise MapFileFormatError('Unrecognized map drawing command "'+ ps_token + '".')
 
@@ -1058,10 +1081,10 @@ class MapSource (object):
     def _pop_store_sym(self, v):
         name = self.stack.pop()
         if name.name.startswith('$'):
-            self._global_symbols[name] = v
+            self._global_symbols[name.name] = v
         else:
-            self._local_symbols[name] = v
-
+            self._local_symbols[name.name] = v
+        
     @RequireArgs('def', '/x')
     def _do_def(self):
         self._pop_store_sym(self.stack.pop())

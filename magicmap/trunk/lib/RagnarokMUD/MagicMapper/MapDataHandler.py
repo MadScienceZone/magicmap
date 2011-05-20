@@ -95,15 +95,20 @@ class MapDataHandler (object):
         if version != 6:
             raise NotImplementedError('Only version 6 magic map format is understood.')
 
+        if public_id_filter is None:
+            public_id_filter = lambda i: i
+
         mapdata = self.encode_map_elements(room.map)
+        print "Room {0} ({1}):".format(room.id, public_id_filter(room.id))
+        if room.also is not None:
+            for a in filter(None, room.also):
+                print "  -- also {0} ({1})".format(a, public_id_filter(a))
         preamble = 'R6 %s %d %s %s %d %d %d' % (
-            self.encode_text(public_id_filter(room.id) if public_id_filter is not None else room.id),
+            self.encode_text(public_id_filter(room.id)),
             room.page.page,
             self.encode_text(room.name),
-            self.encode_text_list(filter(None, [
-                (public_id_filter(i) if public_id_filter is not None else i)
-                    for i in room.also
-            ]) if room.also is not None else None),
+            self.encode_text_list([public_id_filter(i) for i in room.also if i]
+                if room.also is not None else []),
             room.reference_point[0] if room.reference_point is not None else 0,
             room.reference_point[1] if room.reference_point is not None else 0,
             len(mapdata)

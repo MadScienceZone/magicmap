@@ -34,7 +34,7 @@ from RagnarokMUD.MagicMapper.MapDataHandler import MapDataHandler
 from RagnarokMUD.MagicMapper.Local          import gen_public_room_id
 import os, os.path, datetime, re, sys, time
 
-def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=False, verbosity=0):
+def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=False, enforce_creator=True, verbosity=0):
     '''Perform the work of compiling MUD-side files to our digested format.
 
     If the optional creator_from_path parameter is True, then the creator
@@ -74,6 +74,7 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
     creator_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+r'(\w+)')
     rootdir_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+'\w+$')
     map_dir_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+'\w+'+re.escape(os.path.sep)+'map('+re.escape(os.path.sep)+'.*)?$')
+    rootmap_re = re.compile(re.escape(os.path.sep)+'map('+re.escape(os.path.sep)+'.*)?$')
     #core_re    = re.compile(re.escape(os.path.sep)+r'room\b')
 
     for root, dirnames, filenames in os.walk(source_tree):
@@ -90,17 +91,23 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
                         filenames = ['realm.map']
                     else:
                         if verbosity > 2:
-                            sys.stderr.write("Skipping "+root+"\n")
+                            sys.stderr.write(root+" is player area w/o realm.map file; Skipping\n")
                         continue
                 elif not map_dir_re.search(root):
                     if verbosity > 2:
-                        sys.stderr.write("Skipping "+root+"\n")
+                        sys.stderr.write("Skipping non-map dir "+root+"\n")
                     continue
-        #    else:
-        #        creator_name = 'Base World Map'
-
+            elif not rootmap_re.search(root):
+                if verbosity > 2:
+                    sys.stderr.write("Skipping base mudlib non-map dir "+root+"\n")
+                continue
+                
         if verbosity>1:
             sys.stderr.write("Scanning {0}, creator={1}\n".format(root, creator_name))
+
+        # prune subdirs whose names begin with .
+        for hidden_dir_name in [d for d in dirnames if d.startswith('.')]:
+            dirnames.remove(hidden_dir_name)
 
         for filename in filenames:
             if filename.endswith('.map'):
@@ -109,7 +116,7 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
                 try:
                     src_filename = os.path.join(root, filename)
                     magic_map.add_from_file(open(src_filename), 
-                            creator=creator_name, enforce_creator=True, 
+                            creator=creator_name, enforce_creator=enforce_creator, 
                             source_date=datetime.datetime.utcfromtimestamp(os.stat(src_filename).st_mtime),
                             verbosity=verbosity)
                 except Exception, e:
@@ -147,8 +154,10 @@ def make_world(source_tree, dest_tree, creator_from_path=False, ignore_errors=Fa
                     continue
 
             with open(target_name, 'w') as rm:
+                print "** writing", target_name,"**"
                 rm.write(translator.dump_room(room, public_id_filter=gen_public_room_id, gentime=compile_dtm) + '\n')
             if room.source_modified_date:
                 #match the source's timestamp
+                print "** setting time stamp **"
                 os.utime(target_name, 
                         (time.time(), time.mktime(room.source_modified_date.utctimetuple())))

@@ -220,4 +220,4 @@ class NetworkIO (object):
         timeframe, or if the server's copy is not available.  Otherwise, it
         will contact the remote service, cache the result, and return it.'''
         self.log("Retrieving room data from server")
-        return self._get_data('/room/'+room_id[:1] + '/' + room_id, room_id)
+        return self._get_data('/room/'+room_id[:1] + '/' + room_id[:2] + '/' + room_id, room_id)

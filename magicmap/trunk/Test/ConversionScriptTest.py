@@ -51,7 +51,7 @@ class ConversionScriptTest (unittest.TestCase):
             shutil.rmtree(DST)
 
         os.mkdir(DST, 0755)
-        make_world(source_tree=SRC, dest_tree=DST)
+        make_world(source_tree=SRC, dest_tree=DST, enforce_creator=False)
         self.assertTreesEqual(DST, CMP)
 
     def test_map_conversion_with_creators(self):
@@ -59,7 +59,7 @@ class ConversionScriptTest (unittest.TestCase):
             shutil.rmtree(DSTC)
 
         os.mkdir(DSTC, 0755)
-        make_world(source_tree=SRC, dest_tree=DSTC, creator_from_path=True)
+        make_world(source_tree=SRC, dest_tree=DSTC, creator_from_path=True, verbosity=5)
         self.assertTreesEqual(DSTC, CMPC)
 
     def assertTreesEqual(self, actual, expected):
@@ -129,10 +129,14 @@ class ConversionScriptTest (unittest.TestCase):
         expected_file_info = {}
         root = expected
         for dirpath, dirnames, filenames in os.walk(root):
+
             if dirpath.startswith(root):
                 relative_dir = dirpath[len(root):]
             else:
                 raise ValueError("Unexpected path "+dirpath+' encountered (should start with "'+root+'")')
+
+            for hidden_dir_name in [d for d in dirnames if d.startswith('.')]:
+                dirnames.remove(hidden_dir_name)
 
             for filename in filenames:
                 expected_file_info[os.path.join(relative_dir,filename)] = FileInfo(os.path.join(dirpath,filename))
@@ -144,11 +148,14 @@ class ConversionScriptTest (unittest.TestCase):
             else:
                 raise ValueError("Unexpected path "+dirpath+' encountered (should start with "'+root+'")')
 
+            for hidden_dir_name in [d for d in dirnames if d.startswith('.')]:
+                dirnames.remove(hidden_dir_name)
+
             for filename in filenames:
                 path_key = os.path.join(relative_dir,filename)
                 self.assert_(path_key in expected_file_info, 'Generated file "'+os.path.join(dirpath,filename)+'" not found in known-good directory.')
                 actual_file_info = FileInfo(os.path.join(dirpath,filename))
-                self.assertEquals(actual_file_info.checksum, expected_file_info[path_key].checksum, 'File checksum mismatch: '+os.path.join(dirpath,filename))
+                self.assertEquals(actual_file_info.checksum, expected_file_info[path_key].checksum, 'File checksum mismatch: key={0},file={1}'.format(path_key,os.path.join(dirpath,filename)))
                 del expected_file_info[path_key]
             
         self.assertEquals(len(expected_file_info), 0, 'Failed to generate all files: %s\n%d unmatched files total' % (

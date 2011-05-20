@@ -51,11 +51,11 @@ class MapCacheManagerTest (unittest.TestCase):
         del self.cm
 
     def test_fn_1(self):
-        self.assertEquals(self.cm._encode_filename('rmO_aPzcZbw4g_HlzLxk8k'), ('_R', '_R_MO_5F_AP_Z_CZ_B_W4_G_5FH_L_ZL_X_K8_K.MMC'))
+        self.assertEquals(self.cm._encode_filename('rmO_aPzcZbw4g_HlzLxk8k'), ('_R', '_R_M', '_R_MO_5F_AP_Z_CZ_B_W4_G_5FH_L_ZL_X_K8_K.MMC'))
     def test_fn_2(self):
-        self.assertEquals(self.cm._encode_filename('-cRDWjIFbaTKhi4IEUIr6F'), ('_2D', '_2D_CRDW_JIF_B_ATK_H_I4IEUI_R6F.MMC'))
+        self.assertEquals(self.cm._encode_filename('-cRDWjIFbaTKhi4IEUIr6F'), ('_2D', '_2D_C', '_2D_CRDW_JIF_B_ATK_H_I4IEUI_R6F.MMC'))
     def test_fn_3(self):
-        self.assertEquals(self.cm._encode_filename('5B7r7QXftBdRNJEBK0YFPV'), ('5', '5B7_R7QX_F_TB_DRNJEBK0YFPV.MMC'))
+        self.assertEquals(self.cm._encode_filename('5B7r7QXftBdRNJEBK0YFPV'), ('5', '5B', '5B7_R7QX_F_TB_DRNJEBK0YFPV.MMC'))
 
     def test_store(self):
         self.cm.store('Test', StringIO.StringIO('''This is a test file.

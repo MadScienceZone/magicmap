@@ -38,7 +38,7 @@ class CacheManagerError (Exception):
 
 #
 # We store cached copies of the data files in the same format
-# we receive them from the website, in <DIRNAME>/a/abcdef for room abcdef
+# we receive them from the website, in <DIRNAME>/a/ab/abcdef for room abcdef
 # and <DIRNAME>/page/number for pages.
 #
 # Some filesystems don't allow mixed case filenames (or maybe they
@@ -58,9 +58,9 @@ class CacheManagerError (Exception):
 #
 # Examples:
 #
-# rmO_aPzcZbw4g_HlzLxk8k --> _R/_R_MO_5F_AP_Z_CZ_B_W4_GH_L_ZL_X_K8_K
-# -cRDWjIFbaTKhi4IEUIr6F --> _2D/_2D_CRDW_JIF_B_ATK_H_I4IEUI_R6F
-# 5B7r7QXftBdRNJEBK0YFPV --> 5/5B7_R7QX_F_TB_DRNJEBK0YFPV
+# rmO_aPzcZbw4g_HlzLxk8k --> _R/_R_M/_R_MO_5F_AP_Z_CZ_B_W4_GH_L_ZL_X_K8_K
+# -cRDWjIFbaTKhi4IEUIr6F --> _2D/_2D_C/_2D_CRDW_JIF_B_ATK_H_I4IEUI_R6F
+# 5B7r7QXftBdRNJEBK0YFPV --> 5/5B/5B7_R7QX_F_TB_DRNJEBK0YFPV
 #
 # Since Rag uses 22-character room IDs, the worst case scenario
 # is something like:
@@ -84,8 +84,8 @@ class MapCacheManager (object):
 
     def retrieve(self, key):
         "Find the given key in the cache -> None (not found) or (fileobj, age in seconds)"
-        subdir, cache_name = self._encode_filename(key)
-        cache_entry_path = os.path.join(self.cache_dir, subdir, cache_name)
+        d1, d2, cache_name = self._encode_filename(key)
+        cache_entry_path = os.path.join(self.cache_dir, d1, d2, cache_name)
 
         if os.path.exists(cache_entry_path):
             return open(cache_entry_path, 'r'), (time.time() - os.path.getmtime(cache_entry_path))
@@ -98,21 +98,24 @@ class MapCacheManager (object):
 
     def store_str(self, key, data):
         "Store string data into the cache under the given key"
-        subdir, cache_name = self._encode_filename(key)
-        entry_dir = os.path.join(self.cache_dir, subdir)
+        d1, d2, cache_name = self._encode_filename(key)
+        entry_dir = os.path.join(self.cache_dir, d1, d2)
 
         if not os.path.isdir(entry_dir):
             if os.path.exists(entry_dir):
                 raise CacheManagerError('MapCacheManager cannot create directory '+entry_dir+'; there appears to be another file in the way.')
-            os.mkdir(entry_dir)
+            try:
+                os.makedirs(entry_dir)
+            except Exception as err:
+                raise CacheManagerError('System error creating {0}: {1}'.format(entry_dir, err))
 
         with open(os.path.join(entry_dir, cache_name), 'w') as cached_copy:
             cached_copy.write(data)
 
     def remove(self, key):
         "Remove the data from the cache"
-        subdir, cache_name = self._encode_filename(key)
-        entry_path = os.path.join(self.cache_dir, subdir, cache_name)
+        d1, d2, cache_name = self._encode_filename(key)
+        entry_path = os.path.join(self.cache_dir, d1, d2, cache_name)
         if os.path.exists(entry_path):
             os.unlink(entry_path)
 
@@ -122,8 +125,8 @@ class MapCacheManager (object):
         # Silently ignores the request if there is no such
         # cache file; should it?
         #
-        subdir, cache_name = self._encode_filename(key)
-        cache_entry_path = os.path.join(self.cache_dir, subdir, cache_name)
+        d1, d2, cache_name = self._encode_filename(key)
+        cache_entry_path = os.path.join(self.cache_dir, d1, d2, cache_name)
         if os.path.exists(cache_entry_path):
 #            with open(cache_entry_path, 'r+b') as cached_file:
 #                first_byte = cached_file.read(1)
@@ -143,9 +146,11 @@ class MapCacheManager (object):
         return '_%02X' % ord(char)
 
     def _encode_filename(self, id):
-        "Encode an ID (assumed to be printable 7-bit ASCII) into a usable filename -> (dir, filename)"
+        "Encode an ID (assumed to be printable 7-bit ASCII) into a usable filename -> (dir, dir, filename)"
 
         if not id:
-            return ('_00','_00.MMC')
+            return ('_00','_00', '_00.MMC')
 
-        return (self._encode_file_char(id[0]), ''.join([self._encode_file_char(i) for i in id]) + '.MMC')
+        return (self._encode_file_char(id[0]), 
+            ''.join([self._encode_file_char(i) for i in id[:2]]),
+            ''.join([self._encode_file_char(i) for i in id]) + '.MMC')
