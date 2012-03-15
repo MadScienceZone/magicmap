@@ -365,8 +365,13 @@ class MapDataHandler (object):
 
     def load_page_file(self, fileobj):
         "Load a page (returning a new MapPage object) from an encoded file, given a file object to read."
+        return self.load_page_list(fileobj.readlines())
 
-        lines = [s.replace('\r\n', '\n') for s in fileobj.readlines()]
+    def load_page(self, filedata):
+        return self.load_page_list(filedata.splitlines(True))
+
+    def load_page_list(self, lines):
+        lines = [s.replace('\r\n', '\n') for s in lines]
 
         if len(lines) < 2:
             raise MapDataLengthError('Truncated or corrupt page data (only %d line%s)' % (
@@ -393,8 +398,13 @@ class MapDataHandler (object):
 
     def load_room_file(self, fileobj):
         "Load a room (returning a new MapRoom object) from an encoded file, given a file object to read."
+        return self.load_room_list(fileobj.readlines())
 
-        lines = [s.replace('\r\n', '\n') for s in fileobj.readlines()]
+    def load_room(self, roomdata):
+        return self.load_room_list(roomdata.splitlines(True))
+
+    def load_room_list(self, lines):
+        lines = [s.replace('\r\n', '\n') for s in lines]
 
         if len(lines) < 2:
             raise MapDataLengthError('Truncated or corrupt room data (only %d line%s)' % (

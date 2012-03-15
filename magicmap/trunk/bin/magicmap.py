@@ -4,7 +4,7 @@
 # RAGNAROK MAGIC MAPPER SOURCE CODE: mapping client
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2012 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.
@@ -32,7 +32,6 @@ import sys
 import os, os.path
 import wx
 import optparse
-import platform
 
 #@@REL@@sys.tracebacklimit=0
 
@@ -42,27 +41,33 @@ sys.path.append(os.path.join('..','lib'))
 
 from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
 config = ConfigurationManager()
+config.save_first()
 
 from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
-from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
+from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapClientFrame
+from RagnarokMUD.MagicMapper.NetworkIO            import ProxyService
 
-op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.0')
-if platform.system() == 'Windows':
-    op.set_defaults(expand_globs=True, pattern='*.map')
-else:
-    op.set_defaults(pattern='*.map')
+op = optparse.OptionParser(usage='%prog [-hv] [-H hostname] [-P port] [-L localhost] [-p localport]', version='6.0')
+op.set_defaults(
+        hostname=config.get('connection', 'remote_hostname'),
+        local_hostname=config.get('connection', 'local_hostname'),
+        local_port=config.get('connection', 'local_port'),
+        port=config.get('connection', 'remote_port'),
+)
 
-op.add_option('-g', '--expand-globs', action='store_true', help='Expand wildcard patterns in filename list [%default]')
-op.add_option('-I', '--ignore-errors',action='store_true', help='Keep trying to finish even if some errors were found')
-op.add_option('-i', '--image-dir',    metavar='DIR',       help='Top-level embedded image directory')
-op.add_option('-p', '--pattern',      metavar='PAT',       help='Limit recursion to filenames matching wildcard pattern [%default]')
-op.add_option('-r', '--recursive',    action='store_true', help='Recurse into subdirectories looking for map files')
+op.add_option('-H', '--hostname', action='store', metavar='NAME', help='game host [%default]')
+op.add_option('-L', '--local-hostname', action='store', metavar='NAME', help='local proxy host [%default]')
+op.add_option('-p', '--local-port', type='int', action='store', metavar='N', help='local proxy port [%default]')
+op.add_option('-P', '--port', action='store', type='int', metavar='N', help='TCP port [%default]')
 op.add_option('-v', '--verbose',      action='count',      help='Increase verbosity (cumulative)')
 
-opt, cmd_map_file_list = op.parse_args()
+opt, extra_args = op.parse_args()
+
+if extra_args:
+    op.error("Extra non-option arguments")
 
 print """
-             Ragnarok Magic Map 6.0b1 Preview Tool (viewmap)
+                  Ragnarok Magic Map 6.0b1 (magicmap)
                   *** PRE-RELEASE PREVIEW VERSION ***
 
 Thank you for helping us test this program prior to releasing it as ready
@@ -73,36 +78,73 @@ process.
 Error messages about your map pages will show up here as well.  Eventually
 they will be put in a GUI window for you.
 """
+#
+# ConfigurationManager
+# MapClientApp
+#   MapClientFrame (menus)
+#      MapManager (live data + database)
+#         NetworkIO (fetch more data)
+#   ProxyService
+#      AnsiParser
+#
+#
 
-class MapPreviewApp(wx.App):
+class MapClientApp(wx.App):
     def OnInit(self):
-        display_splash_screen('viewmaplogo.png')
-        frame = MapPreviewFrame(title="Magic Map Preview", config=config, prog_name="viewmap",
-            expand_globs = opt.expand_globs,
-            recursive = opt.recursive,
-            pattern = opt.pattern,
-            ignore_errors = opt.ignore_errors,
+        self.scheduled_comms = False
+
+        display_splash_screen('magicmaplogo.png')
+        frame = MapClientFrame(title="Magic Mapper", config=config, prog_name="magicmap",
+#            hostname = opt.hostname,
+#            port = opt.port,
             verbose = opt.verbose,
-            file_list = cmd_map_file_list,
-            image_dir = opt.image_dir,
             about_text = '''
-This application allows wizards to preview what their maps will look like by loading the raw "source" form of the map pages into this viewer.
+This application draws your magic map in real time as you explore the MUD.
 
 Run with the --help option for more details, or see the documentation online.  (Link below)''',
             help_text = '''The official documentation for this program can be found
 online at the following URL:
 
-http://www.rag.com/tech/tools/viewmap
+http://www.rag.com/tech/tools/magicmap
 
-A brief synopsis of viewmap's usage may be displayed by
+A brief synopsis of magicmap's usage may be displayed by
 running it with the --help option.''')
         frame.Show()
         self.SetTopWindow(frame)
+
+        # start communications proxy
+        self.proxy = ProxyService(
+            local_hostname = opt.local_hostname,
+            local_port = opt.local_port,
+            remote_hostname = opt.hostname,
+            remote_port = opt.port,
+            target_viewer = frame
+        )
+        if config.has_section('proxy'):
+            try:
+                if config.getbool('proxy', 'mud_proxy_on'):
+                    self.proxy.set_socks_proxy(config.get('proxy', 'mud_proxy_type'),
+                            config.get('proxy', 'mud_proxy_server'),
+                            config.getint('proxy', 'mud_proxy_port'))
+            except Exception as err:
+                print "XXX Unable to set proxy: {}".format(err)
+
+        self.Bind(wx.EVT_IDLE, self.OnIdle)
         return True
+
+    def OnIdle(self, event):
+        # throttle polls to 100mS intervals
+        if not self.scheduled_comms:
+            wx.CallLater(100, self.DoComms)
+            self.scheduled_comms = True
+
+    def DoComms(self):
+        self.proxy.poll()
+        self.scheduled_comms = False
 
 #    def OnExit(self):
 
-Application = MapPreviewApp(redirect=False)
+Application = MapClientApp(redirect=False)
 Application.MainLoop()
 #@@BEGIN-DEV:
 #

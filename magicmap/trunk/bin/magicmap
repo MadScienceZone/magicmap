@@ -44,7 +44,7 @@ import sys
 
 #@@REL@@sys.tracebacklimit=0
 sys.dont_write_bytecode=True
-modname = 'viewmap'
+modname = 'magicmap'
 file_obj = None
 
 try:
@@ -53,4 +53,3 @@ try:
 finally:
     if file_obj:
         file_obj.close()
-    print "Looking in", os.path.dirname(os.path.abspath(__file__)), "for", modname

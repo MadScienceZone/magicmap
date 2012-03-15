@@ -1,17 +1,7 @@
-#!/usr/local/bin/python
+#!/usr/bin/python
 # vi:set ai sm nu ts=4 sw=4 expandtab:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: mud-side map exporter
-# On some systems, e.g., Microsoft Windows, we need to have a file 
-# with a ".py" suffix so the system can associate it with the Python
-# interpreter which needs to run it.  On other systems, e.g., Linux,
-# Unix, Macintosh OSX, etc., the command is executed without the need 
-# for that suffix, so the extra ".py" is just a distraction and seems
-# weird to have to type.  
-#
-# So this file is just an alternative way to start the tool for the
-# benefit of systems which need it.
-# 
 # $Header$
 #
 # Copyright (c) 2010, 2011 by Steven L. Willoughby, Aloha, Oregon, USA.
@@ -38,15 +28,43 @@
 # risk of any kind from, the correct operation of this software.
 #
 
-import imp
-import os.path
 import sys
+import os, os.path
+import optparse
+import platform
+import glob
+import itertools
 
 #@@REL@@sys.tracebacklimit=0
-exportmaps_full_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'exportmaps')
 
-try:
-	mod = open(exportmaps_full_path, 'U')
-	imp.load_module('exportmaps', mod, '', ('', 'U', 1))
-finally:
-	mod.close()
+#@@BEGIN-DEV:
+#XXX FIXME XXX development hack
+sys.path.append(os.path.join('..','lib'))
+#:END-DEV@@
+
+from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
+import RagnarokMUD.MagicMapper.MagicMapCompiler
+
+config = ConfigurationManager()
+
+op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.0')
+if platform.system() == 'Windows':
+    op.set_defaults(expand_globs=True, pattern='*.map', dest_dir="maproot")
+else:
+    op.set_defaults(pattern='*.map', dest_dir="maproot")
+
+op.add_option('-g', '--expand-globs', action='store_true', help='Expand wildcard patterns in filename list [%default]')
+op.add_option('-I', '--ignore-errors',action='store_true', help='Keep trying to finish even if some errors were found')
+#op.add_option('-i', '--image-dir',    metavar='DIR',       help='Top-level embedded image directory')
+#op.add_option('-p', '--pattern',      metavar='PAT',       help='Limit recursion to filenames matching wildcard pattern [%default]')
+#op.add_option('-r', '--recursive',    action='store_true', help='Recurse into subdirectories looking for map files')
+op.add_option('-d', '--dest-dir',     metavar='DIR',       help="Output directory root [%default]")
+op.add_option('-v', '--verbose',      action='count',      help='Increase verbosity (cumulative)')
+
+opt, cmd_map_file_list = op.parse_args()
+
+if opt.expand_globs:
+    cmd_map_file_list = list(itertools.chain(*[glob.glob(pattern) for pattern in cmd_map_file_list]))
+
+for dir_name in cmd_map_file_list:
+    RagnarokMUD.MagicMapper.MagicMapCompiler.make_world(dir_name, opt.dest_dir, True, opt.ignore_errors, enforce_creator=True, verbosity=opt.verbose)

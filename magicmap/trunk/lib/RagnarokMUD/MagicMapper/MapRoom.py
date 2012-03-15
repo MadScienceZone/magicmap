@@ -31,7 +31,7 @@
 class MapRoom (object):
     '''Describes a single magic map location.  Attributes:
 
-        id:     page id
+        id:     room id
         page:   page object where the room is located.
         name:   name of this room as (potentially) seen by player
         map:    None or image element list

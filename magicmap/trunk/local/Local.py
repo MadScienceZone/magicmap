@@ -60,11 +60,15 @@ from string  import translate, maketrans
 def gen_public_room_id(private_id):
     "Turn private room ID to an obscured but consistent public one."
 
-    return b64encode(md5('5#m,qu3v%'+private_id+'53kreT./.').digest()).translate(
+    bits = b64encode(md5('5#m,qu3v%'+private_id+'53kreT./.').digest()).translate(
         maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
                   '0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ-abcdefghijklmnopqrstuvwxyz'),
         '=')
-#    return translate(b64encode(md5('5#m,qu3v%'+private_id+'53kreT./.').digest()),
-#        maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
-#                  '0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ-abcdefghijklmnopqrstuvwxyz'),
-#        '=')
+    #
+    # compensate for weirdness in final byte due to how the
+    # mud driver's implementation is written
+    #
+    if len(bits) >= 22:
+        return bits[:21] + bits[21].translate(maketrans('0FGH', '0123'))
+
+    return bits

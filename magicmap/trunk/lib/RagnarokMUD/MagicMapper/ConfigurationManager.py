@@ -31,13 +31,21 @@
 import ConfigParser
 import os.path, sys
 
+class InvalidHomeDirectory (Exception): pass
 class ConfigurationManager (ConfigParser.SafeConfigParser):
     def __init__(self, ini_list=None):
         ConfigParser.SafeConfigParser.__init__(self)
+        self._ini_file_path = None
         #
         # defaults
         #
         my_image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GUI', 'images')
+        my_home_dir = os.path.expanduser('~')
+        if my_home_dir == '~':
+            raise InvalidHomeDirectory("unable to determine home directory")
+        my_home_dir = os.path.join(my_home_dir, 
+                ('MagicMapper' if sys.platform.startswith('win') else '.MagicMapper'))
+
         for section_name, section_contents in {
                 'rendering': {
                     'bezier_points':        '20',
@@ -46,20 +54,34 @@ class ConfigurationManager (ConfigParser.SafeConfigParser):
                     'font_magnification':   '0.85',
                     'logo_image':           os.path.join(my_image_path, 'RagnarokMapLogo.png'),
                     'background_tile':      os.path.join(my_image_path, 'parchment.png'),
-                    'page_number_font':    'r',
-                    'page_number_size':    '48',
-                    'page_number_x':       '170',
-                    'page_number_y':       '720',
-                    'page_title_font':     's',
-                    'page_title_size':     '12',
-                    'page_title_x':        '300',
-                    'page_title_y':        '745',
-                    'page_title2_x':       '300',
-                    'page_title2_y':       '730',
+                    'page_number_font':     'r',
+                    'page_number_size':     '48',
+                    'page_number_x':        '170',
+                    'page_number_y':        '720',
+                    'page_title_font':      's',
+                    'page_title_size':      '12',
+                    'page_title_x':         '300',
+                    'page_title_y':         '745',
+                    'page_title2_x':        '300',
+                    'page_title2_y':        '730',
                 },
                 'preview':  {
-                    'location_delay':      '1.0',
-                    'image_dir':           os.path.join('~', 'mapimages'),
+                    'location_delay':       '1.0',
+                    'image_dir':            os.path.join(my_home_dir, 'mapimages'),
+                },
+                'connection': {
+                    'local_hostname':       'localhost',
+                    'local_port':           '2222',
+                    'remote_hostname':      'rag.com',
+                    'remote_port':          '3333',
+                },
+                'cache': {
+                    'recheck_age':          '{0:d}'.format(60*60*24*3),  # 3 days
+                    'location':             os.path.join(my_home_dir, 'cache'),
+                    'db_base':              os.path.join(my_home_dir, 'maps'),
+                },
+                'server': {
+                    'base_url':             'http://www.rag.com/magicmap',
                 },
         }.iteritems():
             self.add_section(section_name)
@@ -69,6 +91,18 @@ class ConfigurationManager (ConfigParser.SafeConfigParser):
         if ini_list is not None:
             self.read(ini_list)
 
-        home_dir = os.path.expanduser('~')
-        if home_dir != '~':
-            self.read(os.path.join(home_dir, ('MagicMapper.ini' if sys.platform.startswith('win') else '.MagicMapper.ini')))
+        self._ini_file_path = os.path.join(my_home_dir, 'MagicMapper.ini')
+            
+        if not os.path.exists(my_home_dir):
+            os.mkdir(my_home_dir)
+
+        self.read(self._ini_file_path)
+
+    def save(self):
+        if self._ini_file_path is not None:
+            with open(self._ini_file_path, 'w') as f:
+                self.write(f)
+
+    def save_first(self):
+        if self._ini_file_path is not None and not os.path.exists(self._ini_file_path):
+            self.save()

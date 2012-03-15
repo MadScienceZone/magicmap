@@ -6,6 +6,7 @@ from unittest import TestSuite, findTestCases
 
 def suite():
     modules_to_test = (
+        'AnsiParserTest',
         'ConfigurationManagerTest',
         'MapCacheManagerTest',
         'MapDataHandlerTest',

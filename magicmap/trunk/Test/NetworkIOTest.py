@@ -42,7 +42,7 @@ if __name__ == '__main__':
     sys.path.append('../lib')
 
 import unittest
-from RagnarokMUD.MagicMapper.NetworkIO import NetworkIO, ServerNotAvailable, DataNotFound
+from RagnarokMUD.MagicMapper.NetworkIO import NetworkIO, ServerNotAvailable, DataNotFound, ProxyService
 from RagnarokMUD.MagicMapper.MapCacheManager import MapCacheManager
 
 WEB_DOCROOT_LIST=['data','compiled_good']
@@ -368,6 +368,19 @@ class NetworkIOTest (unittest.TestCase):
         self.assertEqualsModuloCRLFandFooter(self.client.get_room(TEST_ROOM_f7438_ID), TEST_ROOM_f7438_SERVER_DATA)
         self.assertTrue(os.path.getmtime(self.cache_node[TEST_ROOM_f7438_ID]) > (time.time()-3))
         self.assertTrue(os.path.getmtime(self.cache_node['#10']) > (time.time()-3))
+
+    def test_proxy_connect(self):
+        p = ProxyService('localhost', 2222)
+
+        # On_Idle(self, event):
+        #  if not flag:
+        #    wx.CallLater(<time>, self.Poll)
+        #    flag=True
+        #
+        # Poll(self):
+        #  ...
+        #  flag=False
+
 
 if __name__ == '__main__':
     # Run test web server until stopped
