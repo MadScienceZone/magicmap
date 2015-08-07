@@ -5,7 +5,7 @@ Prerequisites:
   Before beginning, check that your system includes the following software.
     * Python 2.6 or later (This application has not been tested for Python 3.x
       and most likely will not work.) 
-    * WxPython, 2.8.10 or later.
+    * WxPython, 2.8.10 or later.  Available from wxpython.org.
 
   If necessary, DOWNLOAD AND INSTALL these two products first, THEN
   proceed to install MagicMapper.

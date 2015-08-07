@@ -3,7 +3,7 @@
 # RAGNAROK MAGIC MAPPER SOURCE CODE: Network I/O Handler
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2015 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.
@@ -46,6 +46,9 @@ import socket
 import telnetlib
 
 def tiny_hexdump(data):
+    if data is None:
+        return '|None|'
+
     if not data:
         return '|nil|'
 
@@ -647,6 +650,6 @@ class ProxyService (object):
 
 if __name__ == '__main__':
     # start standalone proxy for testing
-    p = ProxyService(remote_port=3333)
+    p = ProxyService(remote_port=2222)
     while True:
         p.poll()
