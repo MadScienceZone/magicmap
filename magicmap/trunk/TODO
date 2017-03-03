@@ -1,9 +1,0 @@
-[ ]  reflow text in LICENSE
-[ ]  installer must get assent to license
-[ ]  scroll bars on canvas
-[ ]  controls to select pages
-[ ]  zoom
-[ ]  cycle test of locations
-[ ]  cycle test of room positions
-[ ]  print function
-[ ]  note that viewmap's globals are truly global since we're assuming you're viewing your own files, and it can't see creator boundaries
