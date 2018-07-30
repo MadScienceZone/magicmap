@@ -1,0 +1,291 @@
+.TH MAGICMAP-CONFIG 5 "Magic Mapper" "Ragnarok MUD" "File Formats"
+'\"
+'\" Ragnarok Magic Mapper Documentation
+'\" Copyright © 2018 by Steven L. Willoughby, Aloha,
+'\" Oregon, USA.  All Rights Reserved.  Licensed under the Open Software
+'\" License version 3.0.
+'\"
+'\" Based on earlier code from the Ragnarok MudShell (MSH) client,
+'\" Copyright (c) 1993, 2000, 2001, 2002, 2003 by Steven L. Willoughby,
+'\" Aloha, Oregon, USA. All Rights Reserved.  MSH is licensed under
+'\" the terms of the GNU Gneral Public License (GPL) version 2.
+'\"
+'\" This product is provided for educational, experimental or personal
+'\" interest use, in accordance with the terms and conditions of the
+'\" aforementioned license agreement, ON AN "AS IS" BASIS AND WITHOUT
+'\" WARRANTY, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION,
+'\" THE WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A
+'\" PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY OF THE ORIGINAL
+'\" WORK IS WITH YOU.  (See the license agreement for full details, 
+'\" including disclaimer of warranty and limitation of liability.)
+'\"
+'\" Under no curcumstances is this product intended to be used where the
+'\" safety of any person, animal, or property depends upon, or is at
+'\" risk of any kind from, the correct operation of this software.
+'\" 
+.SH NAME
+magicmap-config \- Ragnarok Magic Mapper configuration file
+.SH SYNOPSIS
+.B ~/.MagicMapper/MagicMapper.ini
+.SH DESCRIPTION
+.LP
+The operation of the Magic Mapper client may be controlled by the values
+placed in the configuration file described in this document. The mapper will
+create this file with default values if one doesn't exist.
+.LP
+This document describes the file format for this file.  We will begin
+by describing the general format and options, and then describe the
+individual data elements which can appear in the file.
+.SH "FORMAT OVERVIEW"
+.SS Sections
+.LP
+The configuration file is organized into named \*(lqsections.\*(rq  
+Each section describes a single area of concern for the operation of the
+mapper tool.
+.LP
+Each section begins with a line containing the section name in square
+brackets.  For example, the following line begins a section called 
+\*(lqrendering\*(rq:
+.RS
+.B "[rendering]"
+.RE
+.SS "Data Fields"
+.LP
+Each section contains one or more named data fields which provide the 
+data needed by that section.  Each field is defined on a line by itself,
+using the format
+.RS
+.IB name :
+.I value
+.RE
+or
+.RS
+.I name
+.B =
+.I value
+.RE
+.LP
+Note that leading whitespace is stripped from the
+.IR value ,
+so it doesn't matter whether you put spaces around the colons or equals signs.
+.LP
+The field
+.I name
+is case-insensitive, and need only be unique within the section in which it
+appears.
+.SS "Supported Data Types"
+.LP
+The values defined in this file are generally character strings and may
+contain any text characters.  However, where the following descriptions
+mention other data types, the following rules apply:
+.TP
+.I bool
+A Boolean (true/false) value may be written as 
+.RB \*(lq 1 \*(rq,
+.RB \*(lq yes \*(rq,
+.RB \*(lq true \*(rq,
+or
+.RB \*(lq on \*(rq
+to indicate a \*(lqtrue\*(rq value, or as
+.RB \*(lq 0 \*(rq,
+.RB \*(lq no \*(rq,
+.RB \*(lq false \*(rq,
+or
+.RB \*(lq off \*(rq
+to indicate a \*(lqfalse\*(rq value.  Any other value is not allowed and will
+generate an error.  (The quotation marks are
+.I not
+typed in the data value.)
+.TP
+.I int
+An integer value is written as a set of digits 0\-9, optionally preceded by
+a plus or minus sign
+.RB (\*(lq + \*(rq
+or
+.RB \*(lq \- \*(rq).
+.TP
+.I real
+A real number value is written either as for 
+.I int
+values as described above, or as some digits, followed by a decimal
+point
+.RB (\*(lq . \*(rq),
+followed by more digits.  Either (but not both) of the sets of digits may be 
+omitted, so
+.RB \*(lq 12 \*(rq,
+.RB \*(lq \-12.25 \*(rq,
+.RB \*(lq +12. \*(rq,
+.RB \*(lq 0.3 \*(rq,
+and
+.RB \*(lq .3 \*(rq
+are all valid real number values.
+Additionally, numbers may be specified in scientific notation by adding
+the letter 
+.RB \*(lq e \*(rq
+followed by an exponent of 10 to the end of the mantissa.  For example, the
+value
+.RB \*(lq 1.23e5 \*(rq
+represents the real number 123000.0, and the value
+.RB \*(lq 1.23e-5 \*(rq
+represents the real number 0.0000123.
+.SS "Splitting Long Lines"
+.LP
+Ordinarily, each data field is written on its own line, and takes up the entire line.  It must begin in the first column of its line.
+However, a long data value may be split onto multiple lines of the file in
+the same way RFC822 mail headers are: any indented line (i.e., a line beginning
+with whitespace) is assumed to be a continuation of the line above it.  The
+leading whitespace is stripped from the value, but the newline is kept intact.
+.LP
+For example, in the following field definition:
+.RS
+.B "description: This is a very long descriptive string"
+.br
+.B "\ \ \ \ involving two physical lines of the file"
+.RE
+would define the field called \*(lqdescription\*(rq to have the value:
+.RS
+This is a very long descriptive string
+.br
+involving two physical lines of the file
+.RE
+.SS "Variable Substitution"
+.LP
+Field definitions may contain the values of other fields using 
+.IR printf -style
+formatting controls.  Specifically, anywhere in a data field value where the
+following pattern is found:
+.RS
+.BI %( name )s
+.RE
+This is replaced by the value of the data field called
+.I name
+defined in the same section, or in a special section called
+.BR [DEFAULTS] .
+The value being substituted does not need to have been defined 
+above the line where it is being used.  The substitutions are 
+performed at run-time, after the entire configuration file
+has been read.
+.LP
+You can technically put anything between the 
+.RB \*(lq ) \*(rq
+and the
+.RB \*(lq s \*(rq
+that 
+.BR printf (3)
+would allow, but typically you'd use the pattern exactly as shown here.
+Therefore, we won't go into more detail than that.  Advanced or exceedingly
+curious users can look at the documentation for 
+.B printf
+for more details.
+.SS Comments
+.LP
+Any line beginning with a semi-colon
+.RB (\*(lq ; \*(rq)
+or pound sign 
+'\"(octothorpe, sharp, whatever you want to call it)
+.RB (\*(lq # \*(rq)
+is considered to be a comment and is ignored completely.
+.SH DETAILS
+.LP
+The mapper client's configuration parameters are organized into the
+following sections:
+.SS [cache]
+.LP
+These values control how map data is cached locally by the client.
+.TP
+.BI db_base= path
+Housekeeping data are kept in a tree of subdirectories starting with
+.I path
+at the root.
+[Default:
+.BR ~/.MagicMapper/maps ]
+.TP
+.BI location= path
+The cached map data will be stored in a tree of subdirectories starting with
+.I path
+at the root.
+[Default: 
+.BR ~/.MagicMapper/cache ]
+.TP
+.BI recheck_age= sec
+The number of seconds after which the client will check the map server to see if
+the map data have been updated.
+[Default: 259200 (3 days)]
+.SS [connection]
+.LP
+These settings control the network communications parameters used by the mapper
+client:
+.TP
+.BI local_hostanme= host
+Open a local proxy service port on the network insterface named
+.IR host ,
+to which a separate MUD client may connect to play the MUD while the mapper
+only manages the displayed on-screen map.
+[Default:
+.BR localhost ]
+.TP
+.BI local_port= port
+The TCP/IP port number for the local proxy.
+[Default: 2222]
+.TP
+.BI remote_hostanme= host
+Connect to the remote MUD game on the named
+.IR host .
+[Default:
+.BR rag.com ]
+.TP
+.BI remote_port= port
+The TCP/IP port number for the remote MUD game.
+[Default: 2222]
+.SS [preview]
+.LP
+These parameters affect how the wizard's map preview tool operates:
+.TP
+.BI image_dir= path
+Local directory where auxiliary image files are to be found for the
+purpose of previews (in production, they'll be installed with a production
+ID and URL).
+[Default:
+.BR ~/.MagicMapper/mapimages ]
+.TP
+.BI location_delay= sec
+The number of seconds to pause between displaying each room on the map
+while previewing rendering and location indicators.  This is a number of 
+seconds, but may be a real number.
+[Default: 1.0]
+.SS [rendering]
+.LP
+These parameters control the details of how map images are actually drawn on the
+displayed map window:
+.BI bezier_points= n
+When drawing Bezier curves, a larger value of
+.I n
+increases the smoothness of the curve.
+[Default: 20]
+.BI 
+
+
+
+.SS [server]
+.LP
+These parameters control how the client finds the map data server:
+.TP
+.BI base_url= url
+The initial part of the URL from which map data content will be retrieved.
+[Default:
+.BR https://www.rag.com/magicmap ]
+.SH VERSION
+.LP
+This document describes the configuration file format
+used by the version 6 magic mapper.
+.SH HISTORY
+.LP
+This file appeared starting in mapper version 6.0.
+.SH COPYRIGHT
+.LP
+.SH AUTHOR
+.LP
+Steve Willoughby, support@rag.com
+.SH "SEE ALSO"
+.BR magicmap (6).
+.SH BUGS

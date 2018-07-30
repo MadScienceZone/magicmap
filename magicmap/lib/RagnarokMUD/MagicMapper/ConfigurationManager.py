@@ -73,7 +73,7 @@ class ConfigurationManager (ConfigParser.SafeConfigParser):
                     'local_hostname':       'localhost',
                     'local_port':           '2222',
                     'remote_hostname':      'rag.com',
-                    'remote_port':          '3333',
+                    'remote_port':          '2222',
                 },
                 'cache': {
                     'recheck_age':          '{0:d}'.format(60*60*24*3),  # 3 days
