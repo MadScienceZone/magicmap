@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2.7
 # vi:set ai sm nu ts=4 sw=4 expandtab:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: mud-side map exporter
