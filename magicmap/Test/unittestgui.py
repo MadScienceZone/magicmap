@@ -302,7 +302,7 @@ class TkTestRunner(BaseGUITestRunner):
         #self.stopGoButton.config(command=self.stopClicked, text="Stop")
         self.stopGoButton.config(state=tk.DISABLED)
         self.progressBar.setProgressFraction(0.0)
-        self.top.update_idletasks()
+        self.top.update() #_idletasks()
 
     def notifyStopped(self):
         self.stopGoButton.config(state=tk.ACTIVE)
@@ -311,7 +311,7 @@ class TkTestRunner(BaseGUITestRunner):
 
     def notifyTestStarted(self, test):
         self.statusVar.set(str(test))
-        self.top.update_idletasks()
+        self.top.update() #_idletasks()
 
     def notifyTestFailed(self, test, err):
         self.failCountVar.set(1 + self.failCountVar.get())
@@ -393,7 +393,7 @@ class ProgressBar(tk.Frame):
         self.fraction = fraction
         self.color = color
         self.paint()
-        self.canvas.update_idletasks()
+        self.canvas.update() #_idletasks()
         
     def paint(self, *args):
         totalWidth = self.canvas.winfo_width()

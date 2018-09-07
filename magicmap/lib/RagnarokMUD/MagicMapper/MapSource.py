@@ -1589,7 +1589,7 @@ class MapSource (object):
                 if pc >= len(block):
                     # the procedure has run off the end.  stop it now.
                     if so_far >= self._LOOP_MAX:
-                        raise InfiniteLoopError('Loop executed terminated after {0} iterations'.format(so_far))
+                        raise InfiniteLoopError('Loop execution terminated after {0} iterations'.format(so_far))
 
                     if isinstance(remaining, list):             # ranged loop: check parameters
                         remaining[3] += remaining[1]            #   increment loop counter
@@ -1661,7 +1661,7 @@ class PostScriptMapSource (MapSource):
     '''Variation of map representation where the room and page data
     are raw PostScript strings instead of token lists'''
 
-    def compile(self, source):
+    def compile(self, source, allow_test=False, global_symbols=None):
         "Compile source string -> PostScript string"
         return [source]
 

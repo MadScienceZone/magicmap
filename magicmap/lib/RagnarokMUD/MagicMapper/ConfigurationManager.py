@@ -88,15 +88,14 @@ class ConfigurationManager (ConfigParser.SafeConfigParser):
             for field_name, field_value in section_contents.iteritems():
                 self.set(section_name, field_name, field_value)
 
-        if ini_list is not None:
-            self.read(ini_list)
-
         self._ini_file_path = os.path.join(my_home_dir, 'MagicMapper.ini')
             
         if not os.path.exists(my_home_dir):
             os.mkdir(my_home_dir)
 
         self.read(self._ini_file_path)
+        if ini_list is not None:
+            self.read(ini_list)
 
     def save(self):
         if self._ini_file_path is not None:

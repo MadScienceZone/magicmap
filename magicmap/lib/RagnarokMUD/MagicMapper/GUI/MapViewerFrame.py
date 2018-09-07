@@ -97,7 +97,7 @@ class MapViewerFrame (wx.Frame):
         about = wx.AboutDialogInfo()
         about.Name = self.prog_name
         about.Version = '%MAGICMAP_RELEASE%'
-        about.Copyright = 'Ragnarok Magic Mapper (c) 1993, 2000, 2001, 2002, 2003, 2010, 2012.  All Rights Reserved.'
+        about.Copyright = 'Ragnarok Magic Mapper (c) 1993, 2000, 2001, 2002, 2003, 2010, 2012, 2018.  All Rights Reserved.'
         about.Description = wordwrap(self.about_text, 500, wx.ClientDC(self))
         about.WebSite = "http://www.rag.com/tech/tools/{0}".format(self.prog_name), "Program information and documentation"
         about.Developers = ['Written by Steve Willoughby',

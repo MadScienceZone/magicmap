@@ -15,11 +15,13 @@ class MyGUI (unittestgui.TkTestRunner):
         self.failCountVar.set(1 + self.failCountVar.get())
         self.errorListbox.insert(END, "Failure: %s: %s" % (test, err[1].message[:100]))
         self.errorInfo.append((test, err))
+        root.update()
 
     def notifyTestErrored(self, test, err):
         self.errorCountVar.set(1 + self.errorCountVar.get())
         self.errorListbox.insert(END, "Error: %s: %s" % (test, err[1].message[:100]))
         self.errorInfo.append((test, err))
+        root.update()
 
     def showSelectedError(self):
         selection = self.errorListbox.curselection()

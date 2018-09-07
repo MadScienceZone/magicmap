@@ -66,5 +66,4 @@ opt, cmd_map_file_list = op.parse_args()
 if opt.expand_globs:
     cmd_map_file_list = list(itertools.chain(*[glob.glob(pattern) for pattern in cmd_map_file_list]))
 
-for dir_name in cmd_map_file_list:
-    RagnarokMUD.MagicMapper.MagicMapCompiler.make_world(dir_name, opt.dest_dir, True, opt.ignore_errors, enforce_creator=True, verbosity=opt.verbose)
+RagnarokMUD.MagicMapper.MagicMapCompiler.make_world(cmd_map_file_list, opt.dest_dir, True, opt.ignore_errors, enforce_creator=True, verbosity=opt.verbose)
