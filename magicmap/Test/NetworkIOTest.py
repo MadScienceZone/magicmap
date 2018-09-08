@@ -28,11 +28,11 @@
 #
 import datetime
 import threading
-import SimpleHTTPServer, BaseHTTPServer
-import urllib
+import http.server, http.server
+import urllib.request, urllib.parse, urllib.error
 import posixpath
 import os, os.path
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import time
 import shutil
 import email.utils
@@ -108,32 +108,32 @@ TEST_PAGE_10_SERVER_DATA='P6 10 P / @beeker 1\r\n:0\r\n%NWGYFe/Z8cCmojQqSsAjfG+l
 TEST_PAGE_404_ID=404
 TEST_ROOM_404_ID='404'
 
-class TestWebServiceRequestHandler (SimpleHTTPServer.SimpleHTTPRequestHandler):
+class TestWebServiceRequestHandler (http.server.SimpleHTTPRequestHandler):
     def guess_type(self, path):
         return "text/plain"
 
     def translate_path(self, path):
-        words = filter(None, posixpath.normpath(urllib.unquote(path)).split('/'))
+        words = [_f for _f in posixpath.normpath(urllib.parse.unquote(path)).split('/') if _f]
         if words[0] == 'magicmap':
             new_path = os.path.join(*(WEB_DOCROOT_LIST + words[1:]))
         else:
             raise IOError('Unrecognized URL '+path)
 
-        print "path in:", path, "out:", new_path
+        print("path in:", path, "out:", new_path)
         return new_path
 
     def do_GET(self):
         if 'if-modified-since' in self.headers:
-            print "***Client asks for %s only if newer than %s***" % (self.path, self.headers['if-modified-since'])
+            print("***Client asks for %s only if newer than %s***" % (self.path, self.headers['if-modified-since']))
             modified_since = time.mktime(email.utils.parsedate(self.headers['if-modified-since']))
             path = self.translate_path(self.path)
             if os.path.exists(path) and os.path.getmtime(path) <= modified_since:
-                print "---Reply: no, file updated %s, no data for you!" % (time.ctime(os.path.getmtime(path)))
+                print("---Reply: no, file updated %s, no data for you!" % (time.ctime(os.path.getmtime(path))))
                 self.send_response(304)
                 self.end_headers()
                 return None
-            print "---Reply: yes, new data or file not found; dropping to normal server GET handler."
-        return SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+            print("---Reply: yes, new data or file not found; dropping to normal server GET handler.")
+        return http.server.SimpleHTTPRequestHandler.do_GET(self)
 
 
 class NetworkIOTest (unittest.TestCase):
@@ -143,7 +143,7 @@ class NetworkIOTest (unittest.TestCase):
         self.server_thread = None
 
     def assertEqualsModuloCRLF(self, a, b):
-        self.assertEquals(a.replace('\r\n','\n'), b.replace('\r\n', '\n'))
+        self.assertEqual(a.replace('\r\n','\n'), b.replace('\r\n', '\n'))
 
     def assertEqualsModuloCRLFandFooter(self, a, b):
         apct = a.find('\n%')
@@ -151,30 +151,30 @@ class NetworkIOTest (unittest.TestCase):
         if apct > 0: a = a[:apct+1]
         if bpct > 0: b = b[:bpct+1]
 
-        self.assertEquals(a.replace('\r\n','\n'), b.replace('\r\n', '\n'))
+        self.assertEqual(a.replace('\r\n','\n'), b.replace('\r\n', '\n'))
 
     def _diag(self, level, progress, of, msg):
-        print "DIAG TRACE: %s%s%s%s %s" % (
+        print("DIAG TRACE: %s%s%s%s %s" % (
                 ('D' if level & 8 else '-'),
                 ('e' if level & 4 else '-'),
                 ('w' if level & 2 else '-'),
                 ('i' if level & 1 else '-'),
                 msg
-        )
+        ))
         if progress is not None:
-            print "DIAG PROGRESS: %3d of %3d" % (progress, of)
+            print("DIAG PROGRESS: %3d of %3d" % (progress, of))
         self.diags.append((level, progress, of, msg))
 
     def setUp(self):
         # start a web server running on 127.0.0.1:8000
         if self.http_server is not None:
-            print "Stopping previous server instance"
+            print("Stopping previous server instance")
             self._stop_web_server()
 
-        self.http_server = BaseHTTPServer.HTTPServer(('', 8000), TestWebServiceRequestHandler)
+        self.http_server = http.server.HTTPServer(('', 8000), TestWebServiceRequestHandler)
         self.server_thread = threading.Thread(target=self.http_server.serve_forever)
         self.server_thread.start()
-        print "** STARTED SERVER **"
+        print("** STARTED SERVER **")
         #
         # get a client to the server
         #
@@ -186,20 +186,20 @@ class NetworkIOTest (unittest.TestCase):
         self._stop_web_server()
 
     def _stop_web_server(self):
-        print "-- stopping server --"
+        print("-- stopping server --")
         if self.server_thread and self.server_thread.is_alive():
             self.http_server.shutdown()
 
         tries = 10
         while self.server_thread and self.server_thread.is_alive():
-            print "(waiting)"
+            print("(waiting)")
             time.sleep(1)
             tries -= 1
             if tries <= 0:
-                print "**FAILED TO STOP SERVER**"
+                print("**FAILED TO STOP SERVER**")
                 raise Exception('Failed to stop web server')
 
-        print "** STOPPED SERVER **"
+        print("** STOPPED SERVER **")
         self.server_thread = None
         self.http_server = None
 
@@ -207,10 +207,10 @@ class NetworkIOTest (unittest.TestCase):
     # Test basic server data pull capability
     #
     def test_get_page(self):
-        self.assertEqualsModuloCRLFandFooter(urllib2.urlopen('http://localhost:8000/magicmap/page/5').read(), TEST_PAGE_5_DATA)
+        self.assertEqualsModuloCRLFandFooter(urllib.request.urlopen('http://localhost:8000/magicmap/page/5').read(), TEST_PAGE_5_DATA)
 
     def test_get_room(self):
-        self.assertEqualsModuloCRLFandFooter(urllib2.urlopen('http://localhost:8000/magicmap/room/7/70/706c61796572732f66697a62616e2f696e6469612f6d617261').read(), TEST_ROOM_17261_DATA)
+        self.assertEqualsModuloCRLFandFooter(urllib.request.urlopen('http://localhost:8000/magicmap/room/7/70/706c61796572732f66697a62616e2f696e6469612f6d617261').read(), TEST_ROOM_17261_DATA)
 
     #
     # Network connectivity and caching tests
@@ -239,7 +239,7 @@ class NetworkIOTest (unittest.TestCase):
             # This updates the "compiled time" value (2nd element in footer line).
             #
             with open(pathname, 'r') as mapfile:
-                file_data = filter(None, mapfile.read().replace('\r\n', '\n').split('\n'))
+                file_data = [_f for _f in mapfile.read().replace('\r\n', '\n').split('\n') if _f]
 
             if file_data[-1][0] != '%':
                 raise ValueError('cache file %s: invalid footer line %s' % (pathname, file_data[-1]))
@@ -384,6 +384,6 @@ class NetworkIOTest (unittest.TestCase):
 
 if __name__ == '__main__':
     # Run test web server until stopped
-    print "Starting web serer on port 8000"
-    httpd = BaseHTTPServer.HTTPServer(('', 8000), TestWebServiceRequestHandler)
+    print("Starting web serer on port 8000")
+    httpd = http.server.HTTPServer(('', 8000), TestWebServiceRequestHandler)
     httpd.serve_forever()

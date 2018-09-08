@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
 from RagnarokMUD.MagicMapper.MapCacheManager import MapCacheManager
 from RagnarokMUD.MagicMapper.AnsiParser      import AnsiParser, IncompleteSequence
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import time
 import select
 import socket
@@ -147,7 +147,7 @@ class NetworkIO (object):
             # We want the 2nd field (<data-timestamp>) and will check
             # to see if the server has anything newer than that.
             #
-            cache_data_checksum, cache_data_time = filter(None, cached_data.split('\n'))[-1].split()[:2]
+            cache_data_checksum, cache_data_time = [_f for _f in cached_data.split('\n') if _f][-1].split()[:2]
             if not cache_data_checksum.startswith('%'):
                 self.log('Cache entry "%s" invalid (footer format error), may be corrupt.' % key, 2)
                 self.cache.remove(key)
@@ -170,15 +170,15 @@ class NetworkIO (object):
                 #
                 try:
                     self.log('Checking server attributes to see if newer data are available', 8)
-                    req = urllib2.Request(self.base_url + url, headers={
+                    req = urllib.request.Request(self.base_url + url, headers={
                         'If-Modified-Since': data_http_time,
                     }, unverifiable=True)
                     #if self.config.has_option('proxy', 'map_proxy_url'):
                         #req.set_proxy(self.config.get('proxy', 'map_proxy_url'))
                     #req.set_proxy()
-                    hose = urllib2.urlopen(req)
+                    hose = urllib.request.urlopen(req)
                     self.log('Server copy is newer; using that', 8)
-                except urllib2.HTTPError as problem:
+                except urllib.error.HTTPError as problem:
                     if problem.code == 304:
                         self.log('Server does not have newer copy; using cache', 8)
                         self.cache.touch(key)
@@ -191,7 +191,7 @@ class NetworkIO (object):
                         self.log('HTTP error %d trying to get new copy of %s from server; using cached copy for now.' % (
                             problem.code, key))
                         return cached_data
-                except urllib2.URLError as problem:
+                except urllib.error.URLError as problem:
                     self.log('Unable to contact map server (%s); using (stale) cached data anyway.' % problem.reason, 2)
                     return cached_data
         else:
@@ -200,9 +200,9 @@ class NetworkIO (object):
             #
             try:
                 self.log('Opening data connection to '+self.base_url+url, 8)
-                hose = urllib2.urlopen(urllib2.Request(self.base_url + url, unverifiable=True))
+                hose = urllib.request.urlopen(urllib.request.Request(self.base_url + url, unverifiable=True))
 
-            except urllib2.HTTPError as problem:
+            except urllib.error.HTTPError as problem:
                 if cached_data is not None:
                     self.log('Map data not found on server, using old cached data anyway.', 2)
                     return cached_data
@@ -210,7 +210,7 @@ class NetworkIO (object):
                 self.log('Requested map data "%s" not found on server (HTTP error %d).' % (url, problem.code), 4)
                 raise DataNotFound('Map data for "%s" not found on server (HTTP error %d)' % (url, problem.code))
 
-            except urllib2.URLError as problem:
+            except urllib.error.URLError as problem:
                 if cached_data is not None:
                     self.log('Unable to contact map server (%s); using (stale) cached data anyway.' % problem.reason, 2)
                     return cached_data
@@ -312,7 +312,7 @@ class ProxyService (object):
                         + chr(octets[3] & 0xff)
                         + (self.socks_username or '') + '\0')
 
-                print "XXX Requesting proxy via SOCKS4: {}".format(tiny_hexdump(send))
+                print("XXX Requesting proxy via SOCKS4: {}".format(tiny_hexdump(send)))
             else:
                 send = ('\4\1'
                         + chr((self.remote_port >> 8) & 0xff)
@@ -320,13 +320,13 @@ class ProxyService (object):
                         + '\0\0\0\1'
                         + (self.socks_username or '') + '\0'
                         + self.remote_hostname + '\0')
-                print "XXX Requesting proxy via SOCKS4a: {}".format(tiny_hexdump(send))
+                print("XXX Requesting proxy via SOCKS4a: {}".format(tiny_hexdump(send)))
 
             self.mud_server.write(send)
             self._grab_bytes(2)
             while self._socks_recv[0] != '\0':
                 if 0x5a <= ord(self._socks_recv[0]) <= 0x5d:
-                    print "XXX It appears the SOCKS4 proxy dropped the NULL byte; adjusting..."
+                    print("XXX It appears the SOCKS4 proxy dropped the NULL byte; adjusting...")
                     self._socks_recv = '\0' + self._socks_recv
                     continue
 
@@ -341,16 +341,16 @@ class ProxyService (object):
                         'Client identd validation failure' if self._socks_recv[1] == '\x5d' else
                         'Unknown reason code 0x{:02x}'.format(ord(self._socks_recv[1])))))
             self._grab_bytes(8)
-            print "XXX SOCKS4 proxy connection established ({})".format(tiny_hexdump(self._socks_recv))
+            print("XXX SOCKS4 proxy connection established ({})".format(tiny_hexdump(self._socks_recv)))
             if len(self._socks_recv) > 8:
-                print "XXX Over-read by {}; passing '{}' on to MUD session...".format(len(self._socks_recv)-8, tiny_hexdump(self._socks_recv[8:]))
+                print("XXX Over-read by {}; passing '{}' on to MUD session...".format(len(self._socks_recv)-8, tiny_hexdump(self._socks_recv[8:])))
                 self._server_hold_data += self._socks_recv[8:]
             self._socks_recv = ''
 
         #--- SOCKS5 ---#
         elif self.socks_version == '5':
             send = '\5\2\0\2'
-            print "XXX Requesting proxy via SOCKS5: {}".format(tiny_hexdump(send))
+            print("XXX Requesting proxy via SOCKS5: {}".format(tiny_hexdump(send)))
             self.mud_server.write(send)
             self._grab_bytes(2)
             if self._socks_recv[0] != '\5':
@@ -369,7 +369,7 @@ class ProxyService (object):
                     raise SocksError("SOCKS authentication password/username too long")
 
                 send = '\1'+chr(len(self.socks_username))+self.socks_username+chr(len(self.socks_password))+self.socks_password
-                print "XXX Server requests username/password auth, sending: {}".format(tiny_hexdump(send))
+                print("XXX Server requests username/password auth, sending: {}".format(tiny_hexdump(send)))
                 self._grab_bytes(2)
                 if self._socks_recv[0] != '\1':
                     self.hangup()
@@ -379,11 +379,11 @@ class ProxyService (object):
                     self.hangup()
                     raise SocksError("Login to SOCKS5 proxy failed (code {})".format(reply))
 
-                print "XXX Login to SOCKS5 server successful."
+                print("XXX Login to SOCKS5 server successful.")
 
             elif auth_method == 0:
                 # method 0: nothing at all, move along...
-                print "XXX SOCKS5 server does not require logins."
+                print("XXX SOCKS5 server does not require logins.")
 
             else:
                 self.hangup()
@@ -396,7 +396,7 @@ class ProxyService (object):
 
             send='\5\1\0\3' + chr(len(self.remote_hostname)) + self.remote_hostname \
                     + chr((self.remote_port >> 8) & 0xff) + chr(self.remote_port & 0xff)
-            print "XXX Requesting proxied connection to MUD server: {}".format(tiny_hexdump(send))
+            print("XXX Requesting proxied connection to MUD server: {}".format(tiny_hexdump(send)))
             self.mud_server.write(send)
             self._grab_bytes(2)
             if self._socks_recv[0] != '\5':
@@ -450,21 +450,21 @@ class ProxyService (object):
                 self.hangup()
                 raise SocksError("SOCKS5 gave unintelligible reply to final handshake: {}".format(tiny_hexdump(self._socks_recv)))
                 
-            print "XXX SOCKS5 connection established to", host
+            print("XXX SOCKS5 connection established to", host)
             if len(self._socks_recv) > extra:
-                print "XXX Over-read by {}; passing '{}' on to MUD session...".format(len(self._socks_recv)-extra, 
-                        tiny_hexdump(self._socks_recv[extra:]))
+                print("XXX Over-read by {}; passing '{}' on to MUD session...".format(len(self._socks_recv)-extra, 
+                        tiny_hexdump(self._socks_recv[extra:])))
                 self._server_hold_data += self._socks_recv[extra:]
             self._socks_recv = ''
 
 
     def _grab_bytes(self, size):
         while len(self._socks_recv) < size:
-            print "XXX Waiting for {} more byte{} from SOCKS server... got '{}' so far".format(size-len(self._socks_recv), (
-                '' if size-len(self._socks_recv)==1 else 's'), tiny_hexdump(self._socks_recv))
+            print("XXX Waiting for {} more byte{} from SOCKS server... got '{}' so far".format(size-len(self._socks_recv), (
+                '' if size-len(self._socks_recv)==1 else 's'), tiny_hexdump(self._socks_recv)))
             #self._socks_recv += self.mud_server.read_some()
             self._socks_recv += self.mud_server.rawq_getchar()
-        print "XXX Read {} from source: {}".format(len(self._socks_recv), tiny_hexdump(self._socks_recv))
+        print("XXX Read {} from source: {}".format(len(self._socks_recv), tiny_hexdump(self._socks_recv)))
 
 
     def close_local_port(self):
@@ -499,7 +499,7 @@ class ProxyService (object):
                 self.local_hostname, self.local_port))
 
         # XXX log connection
-        print "Opened local proxy {} on {}:{} ({})".format(self.local_socket, self.local_hostname, self.local_port, sa)
+        print("Opened local proxy {} on {}:{} ({})".format(self.local_socket, self.local_hostname, self.local_port, sa))
         
 
     def poll(self):
@@ -509,7 +509,7 @@ class ProxyService (object):
         # but we need a way to quickly check to see if we have incoming
         # data to move on to its destination.
 
-        f_list = filter(None, [self.local_socket, self.mud_client])
+        f_list = [_f for _f in [self.local_socket, self.mud_client] if _f]
         if f_list:
             reads, writes, errors = select.select(f_list, [], [], 0)
 
@@ -522,12 +522,12 @@ class ProxyService (object):
                     connection, address = self.local_socket.accept()
                     connection.send("Sorry, there is already a client connected to the Magic Mapper.\r\n")
                     connection.close()
-                    print "XXX Connection refused to {} (too many clients)".format(address)
+                    print("XXX Connection refused to {} (too many clients)".format(address))
                 else:
                     self.mud_client, self.mud_client_address = self.local_socket.accept()
                     # XXX log connection
-                    print "XXX Connection from {} to magicmap... proxying to {}:{}".format(
-                            self.mud_client_address, self.remote_hostname, self.remote_port)
+                    print("XXX Connection from {} to magicmap... proxying to {}:{}".format(
+                            self.mud_client_address, self.remote_hostname, self.remote_port))
                     try:
                         if self.socks_version is not None:
                             self.mud_server = telnetlib.Telnet(self.socks_server, self.socks_port, 30)
@@ -537,10 +537,10 @@ class ProxyService (object):
                         else:
                             self.mud_server = telnetlib.Telnet(self.remote_hostname, self.remote_port, 30)
                             self.mud_server.set_option_negotiation_callback(self.handle_telnet_option)
-                        print "XXX Connected to MUD {}, port {}".format(self.remote_hostname, self.remote_port)
+                        print("XXX Connected to MUD {}, port {}".format(self.remote_hostname, self.remote_port))
                     except Exception as err:
-                        print 'Connection to MUD {}, port {} error: {}\r\n'.format(
-                                self.remote_hostname, self.remote_port, err)
+                        print('Connection to MUD {}, port {} error: {}\r\n'.format(
+                                self.remote_hostname, self.remote_port, err))
                         self.mud_client.send(
                                 'Connection to MUD {}, port {} error: {}\r\n'.format(
                                 self.remote_hostname, self.remote_port, err))
@@ -556,27 +556,27 @@ class ProxyService (object):
                     pos = data.find('\xff')
                     while pos >= 0:
                         if len(data) < pos+3:
-                            print "XXX Telnet protocol bytes incomplete; wating for more from client..."
+                            print("XXX Telnet protocol bytes incomplete; wating for more from client...")
                             self._client_hold_data = data
                             data = None
                             return
 
-                        print "XXX Ignoring Telnet protocol bytes {:02x}{:02x}{:02x}".format(
-                                ord(data[pos]), ord(data[pos+1]), ord(data[pos+2]))
+                        print("XXX Ignoring Telnet protocol bytes {:02x}{:02x}{:02x}".format(
+                                ord(data[pos]), ord(data[pos+1]), ord(data[pos+2])))
                         data = data[:pos] + data[pos+3:]
                         pos = data.find('\xff')
 
                     if self.echo:
-                        print "XXX received", len(data), "from client:", tiny_hexdump(data)
+                        print("XXX received", len(data), "from client:", tiny_hexdump(data))
                     else:
-                        print "XXX received", len(data), "from client: [not shown]"
+                        print("XXX received", len(data), "from client: [not shown]")
                     self.mud_server.write(data)
 
                 except socket.error:
                     # On second thought, they rang just to say they hung up on us.
                     # That's not very nice
                     # XXX log disconnect
-                    print "XXX client disconnected from proxy."
+                    print("XXX client disconnected from proxy.")
                     if self.mud_client:
                         self.mud_client.close()
                         self.mud_client = None
@@ -592,11 +592,11 @@ class ProxyService (object):
                 self._server_hold_data = ''
                 data = self.ansi_parser.filter(data)
             except EOFError:
-                print "XXX MUD disconnected."
+                print("XXX MUD disconnected.")
                 self.hangup()
                 data = None
             except IncompleteSequence:
-                print "XXX Incomplete ANSI sequence received.  Saving {} for later.".format(data)
+                print("XXX Incomplete ANSI sequence received.  Saving {} for later.".format(data))
                 self._server_hold_data = data
                 data = None
 
@@ -604,7 +604,7 @@ class ProxyService (object):
                 self.mud_client.sendall(data)
 
     def hangup(self):
-        print "XXX severing connection to MUD."
+        print("XXX severing connection to MUD.")
         self.mud_server = None
         if self.mud_client:
             self.mud_client.sendall("MUD Server closed the connection.\r\n")
@@ -621,30 +621,30 @@ class ProxyService (object):
                 self.echo = False
                 if self.mud_client:
                     self.mud_client.sendall(telnetlib.IAC+telnetlib.WILL+telnetlib.ECHO)
-                print "XXX turning echo off"
+                print("XXX turning echo off")
 
             elif command == telnetlib.WONT:
                 # server is saying it won't echo, so we have to
                 self.echo = True
                 if self.mud_client:
                     self.mud_client.sendall(telnetlib.IAC+telnetlib.WONT+telnetlib.ECHO)
-                print "XXX turning echo on"
+                print("XXX turning echo on")
             elif command == telnetlib.DO:
                 # server is asking US to echo now?  okay...
                 self.echo = True
                 if self.mud_client:
                     self.mud_client.sendall(telnetlib.IAC+telnetlib.DO+telnetlib.ECHO)
-                print "XXX turning echo on"
+                print("XXX turning echo on")
             elif command == telnetlib.DONT:
                 # server is asking US to NOT echo.
                 self.echo = False
                 if self.mud_client:
                     self.mud_client.sendall(telnetlib.IAC+telnetlib.DONT+telnetlib.ECHO)
-                print "XXX turning echo off"
+                print("XXX turning echo off")
             else:
-                print "XXX unknown echo command {}".format(command)
+                print("XXX unknown echo command {}".format(command))
         else:
-            print "XXX unknown telnet protocol option setting {}.{}".format(command, option)
+            print("XXX unknown telnet protocol option setting {}.{}".format(command, option))
 
 
 

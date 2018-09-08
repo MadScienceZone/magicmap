@@ -368,6 +368,10 @@ class MapSource (object):
         if file is not None:
             self.add_from_file(file)
 
+    def _clean_dict(self, d):
+        if 'map' in d and d['map'].strip() == '':
+            del d['map']
+
     def _each_record(self, input_file):
         "Scan file for record blocks, generating record dictionaries for each found."
 
@@ -389,6 +393,7 @@ class MapSource (object):
                 current_tag = decl.group('tag')
                 if current_tag == 'room':
                     if current_record:
+                        self._clean_dict(current_record)
                         yield current_record
                         current_record = {}
                     
@@ -430,6 +435,7 @@ class MapSource (object):
         # yield last read block, if any
         #
         if current_record:
+            self._clean_dict(current_record)
             yield current_record
 
     def _normalize_room_path(self, path, creator=None):
@@ -491,7 +497,7 @@ class MapSource (object):
     def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None, verbosity=5):
         "Add rooms and places to this file from a map source file."
         if verbosity > 2:
-            sys.stdout.write("MapSource.add_from_file(creator={0}, enforce_creator={1}, source_date={2}, verbosity={3}\n".format(`creator`, enforce_creator, `source_date`, verbosity))
+            sys.stdout.write("MapSource.add_from_file(creator={0}, enforce_creator={1}, source_date={2}, verbosity={3}\n".format(repr(creator), enforce_creator, repr(source_date), verbosity))
 
         global_key = creator or '.CORE.'
         if global_key not in self.realm_globals:
@@ -501,7 +507,7 @@ class MapSource (object):
             for required_field in 'room', 'page':
                 if required_field not in record:
                     raise MapFileFormatError('Map source file record does not contain a "'
-                            +required_field+'" field: ' + `record`)
+                            +required_field+'" field: ' + repr(record))
             #
             # set up containing page first
             #
@@ -531,7 +537,7 @@ class MapSource (object):
                 sys.stderr.write("room normalization {0} -> {1} (creator {2} -> {3})\n".format(
                     record['room'], room_name, creator, room_creator))
             if room_name in self.room_page:
-                raise DuplicateRoomError('Room '+room_name+' was already defined (on page '+`self.room_page[room_name]`+')')
+                raise DuplicateRoomError('Room '+room_name+' was already defined (on page '+repr(self.room_page[room_name])+')')
 
             if enforce_creator:
                 # Ensure that we don't have user A defining room maps in user B's
@@ -555,7 +561,7 @@ class MapSource (object):
                 self.compile(record['map'], global_symbols=self.realm_globals[global_key])
                     if 'map' in record else None,
                 [self._normalize_room_path(p, creator)[0] 
-                    for p in filter(None, record.get('also','').split('\n'))],
+                    for p in [_f for _f in record.get('also','').split('\n') if _f]],
                 reference_point=record.get('ref'),
                 source_modified_date=source_date))
 
@@ -933,7 +939,7 @@ class MapSource (object):
 
         self._stop_tokenizer()
         if self.stack:
-            raise MapFileFormatError('Extra values in map definition with nowhere to go: ' + `self.stack`)
+            raise MapFileFormatError('Extra values in map definition with nowhere to go: ' + repr(self.stack))
         if self.drawing_mode_list is not None:
             raise MapFileFormatError('Drawing path not completed (missing "stroke" or "fill"?)')
         return object
@@ -1283,14 +1289,14 @@ class MapSource (object):
         pointlist = self.stack.pop()
         if len(pointlist) < 4:
             raise MapFileFormatError('acurveto requires at least 2 points in the list')
-        self._append_path_coords('acurveto', 'b', zip(pointlist[0::2], pointlist[1::2]), isolate=True)
+        self._append_path_coords('acurveto', 'b', list(zip(pointlist[0::2], pointlist[1::2])), isolate=True)
 
     @RequireArgs('scurveto', 'p')
     def _do_scurveto(self):
         pointlist = self.stack.pop()
         if len(pointlist) < 2:
             raise MapFileFormatError('scurveto requires at least 1 point in the list')
-        self._append_path_coords('scurveto', 's', zip(pointlist[0::2], pointlist[1::2]), isolate=True)
+        self._append_path_coords('scurveto', 's', list(zip(pointlist[0::2], pointlist[1::2])), isolate=True)
 
     @RequireArgs('curveto', 'cccccc')
     def _do_curveto(self):
@@ -1732,21 +1738,21 @@ def string_escape_translator(code):
     r"given a special character code (e.g., the 'n' or '123' part of '\n' or '\123'), return the character it represents."
 
     special_codes = {
-                        '[/c]': 0242,   # cents
-                        '[S]':  0247,   # section
-                        '[``]': 0252,   # open " quotes
-                        '[<<]': 0253,   # open << quotes
-                        '[-]':  0261,   # en-dash
-                        '-':    0261,   # minus
-                        '[+]':  0262,   # dagger
-                        '[++]': 0263,   # double dagger
-                        '[P]':  0266,   # paragraph (pilcrow)
-                        '[*]':  0267,   # bullet
-                        "['']": 0272,   # close " quotes
-                        '[>>]': 0273,   # close >> quotes
-                        '[--]': 0320,   # em-dash
-                        '[AE]': 0341,   # AE ligature
-                        '[ae]': 0361,   # ae ligature
+                        '[/c]': 0o242,   # cents
+                        '[S]':  0o247,   # section
+                        '[``]': 0o252,   # open " quotes
+                        '[<<]': 0o253,   # open << quotes
+                        '[-]':  0o261,   # en-dash
+                        '-':    0o261,   # minus
+                        '[+]':  0o262,   # dagger
+                        '[++]': 0o263,   # double dagger
+                        '[P]':  0o266,   # paragraph (pilcrow)
+                        '[*]':  0o267,   # bullet
+                        "['']": 0o272,   # close " quotes
+                        '[>>]': 0o273,   # close >> quotes
+                        '[--]': 0o320,   # em-dash
+                        '[AE]': 0o341,   # AE ligature
+                        '[ae]': 0o361,   # ae ligature
     }
 
     if code in special_codes:
@@ -1757,7 +1763,7 @@ def string_escape_translator(code):
     except:
         raise MapFileFormatError(r'Invalid string escape code "\{0}".'.format(code))
 
-    if 32 <= ch < 127 or ch in special_codes.values():
+    if 32 <= ch < 127 or ch in list(special_codes.values()):
         return chr(ch)
 
     raise MapFileFormatError(r'Invalid string escape code "\{0}" (out of allowed range of character codes).'.format(code))

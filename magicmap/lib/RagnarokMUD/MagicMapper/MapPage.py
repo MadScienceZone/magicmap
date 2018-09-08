@@ -82,7 +82,7 @@ class MapPage (object):
     def add_room(self, room):
         "Add a MapRoom object to this page of the map."
         if room.id in self.rooms:
-            raise DuplicateRoomError('Room '+room.id+' already defined on page '+`self.page`)
+            raise DuplicateRoomError('Room '+room.id+' already defined on page '+repr(self.page))
 
         self.rooms[room.id] = room
 

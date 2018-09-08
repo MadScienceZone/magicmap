@@ -77,7 +77,7 @@ class MapCacheManager (object):
         if not os.path.isdir(dirname):
             if os.path.exists(dirname):
                 raise CacheManagerError('MapCacheManager canot create directory '+dirname+'; there appears to be another file in the way.')
-            os.mkdir(dirname, 0755)
+            os.mkdir(dirname, 0o755)
 
     def close(self):
         pass

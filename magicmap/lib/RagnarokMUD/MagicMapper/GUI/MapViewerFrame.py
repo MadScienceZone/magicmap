@@ -184,46 +184,46 @@ class MapPreviewFrame (MapViewerFrame):
         #
         # Get list of map files to preview
         #
-        if self.verbose > 1: print "OnReload(): file_list=", self.file_list, "recursive=", self.recursive
+        if self.verbose > 1: print("OnReload(): file_list=", self.file_list, "recursive=", self.recursive)
 
         if self.expand_globs:
             map_file_list = list(itertools.chain(*[glob(pattern) for pattern in self.file_list]))
         else:
             map_file_list = self.file_list
 
-        if self.verbose > 1: print "OnReload(): map_file_list=", map_file_list
+        if self.verbose > 1: print("OnReload(): map_file_list=", map_file_list)
 
         if self.recursive:
             root_list, map_file_list = map_file_list, []
             for root in root_list:
-                if self.verbose > 1: print "OnReload(): recursing:", root
+                if self.verbose > 1: print("OnReload(): recursing:", root)
                 for dirpath, dirnames, filenames in os.walk(root):
-                    if self.verbose > 1: print "OnReload(): recursing:", root, "--(", dirpath, dirnames, filenames, ")--"
+                    if self.verbose > 1: print("OnReload(): recursing:", root, "--(", dirpath, dirnames, filenames, ")--")
                     map_file_list.extend([os.path.join(dirpath, f) for f in filenames if fnmatch(f, self.pattern)])
-            if self.verbose > 1: print "OnReload(): map_file_list=", map_file_list
+            if self.verbose > 1: print("OnReload(): map_file_list=", map_file_list)
         #
         # Load and compile them into memory
         #
         self.world_map = MapSource()
 
         for map_file in map_file_list:
-            if self.verbose: print "*** Loading {0} ***".format(map_file)
+            if self.verbose: print("*** Loading {0} ***".format(map_file))
 
             try:
                 self.world_map.add_from_file(open(map_file))
             except (MapFileFormatError, DuplicateRoomError) as problem:
-                print "ERROR in {0}: {1}".format(map_file, problem)
+                print("ERROR in {0}: {1}".format(map_file, problem))
                 if not self.ignore_errors:
-                    print "Processing stopped on fatal map error (use --ignore-errors to avoid this)."
+                    print("Processing stopped on fatal map error (use --ignore-errors to avoid this).")
                     raise
 
         if self.verbose:
-            print "\n*** Loaded {0} page{1} ({2} room{3}) from {4} map source file{5}. ***".format(
+            print("\n*** Loaded {0} page{1} ({2} room{3}) from {4} map source file{5}. ***".format(
                 len(self.world_map.pages), '' if len(self.world_map.pages)==1 else 's',
                 len(self.world_map.room_page), '' if len(self.world_map.room_page)==1 else 's',
                 len(map_file_list), '' if len(map_file_list)==1 else 's'
-            )
-            print "Map page list:", sorted(self.world_map.pages)
+            ))
+            print("Map page list:", sorted(self.world_map.pages))
 
         self.SetStatusText("")
         #
@@ -244,7 +244,7 @@ class MapPreviewFrame (MapViewerFrame):
     def OnPrevPage(self, event): self._set_page_idx((self.page_idx - 1) % len(self.page_list))
 
     def OnLocationTest(self, event): 
-        wx.FutureCall(1, self.NextLocationTest, sorted([room.id for room in self.canvas.page_obj.rooms.values()]))
+        wx.FutureCall(1, self.NextLocationTest, sorted([room.id for room in list(self.canvas.page_obj.rooms.values())]))
 
     def NextLocationTest(self, room_id_list):
         if len(room_id_list) > 0:
@@ -301,19 +301,19 @@ class MapClientFrame (MapViewerFrame):
 
     def tracking_position(self, room_id=None):
         if room_id is None:
-            print "XXX you are now off the map"
+            print("XXX you are now off the map")
             return
 
-        print 'XXX tracking_position({})'.format(room_id)
+        print('XXX tracking_position({})'.format(room_id))
         current_location = self.world_map.move_to(room_id)
         if current_location is None:
-            print "XXX you are now off the map (not expected: {})".format(room_id)
+            print("XXX you are now off the map (not expected: {})".format(room_id))
         else:
-            print "XXX you are now in room {}, page {}".format(
-                    current_location.id, current_location.page.page)
+            print("XXX you are now in room {}, page {}".format(
+                    current_location.id, current_location.page.page))
 
     def tracking_sync(self, i, total, modtime, checksum, room_id):
-        print "XXX update", i, "of", total, "mod", modtime, "chk", checksum, "id", room_id
+        print("XXX update", i, "of", total, "mod", modtime, "chk", checksum, "id", room_id)
         self.world_map.load(room_id, modtime, checksum)
 
 #    def OnOpenFiles(self, event): 

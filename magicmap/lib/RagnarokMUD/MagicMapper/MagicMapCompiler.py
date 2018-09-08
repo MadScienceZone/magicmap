@@ -68,7 +68,7 @@ def make_world(source_trees, dest_tree, creator_from_path=False, ignore_errors=F
     # (sorry VMS)
     #
     if verbosity:
-        sys.stderr.write("MagicMapCompiler.make_world(source_trees={0}, dest_tree={1}, creator_from_path={2}, ignore_errors={3}, verbosity={4})\n".format(`source_trees`, `dest_tree`, `creator_from_path`, `ignore_errors`, `verbosity`))
+        sys.stderr.write("MagicMapCompiler.make_world(source_trees={0}, dest_tree={1}, creator_from_path={2}, ignore_errors={3}, verbosity={4})\n".format(repr(source_trees), repr(dest_tree), repr(creator_from_path), repr(ignore_errors), repr(verbosity)))
         sys.stderr.write("compile_dtm={0}\n".format(compile_dtm))
 
     creator_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+r'(\w+)')
@@ -120,7 +120,7 @@ def make_world(source_trees, dest_tree, creator_from_path=False, ignore_errors=F
                                 creator=creator_name, enforce_creator=enforce_creator, 
                                 source_date=datetime.datetime.utcfromtimestamp(os.stat(src_filename).st_mtime),
                                 verbosity=verbosity)
-                    except Exception, e:
+                    except Exception as e:
                         if ignore_errors:
                             sys.stderr.write('%s: parser error: %s\n' % (src_filename, e))
                         else:
@@ -135,12 +135,12 @@ def make_world(source_trees, dest_tree, creator_from_path=False, ignore_errors=F
     if not os.path.exists(os.path.join(dest_tree, 'page')):
         os.makedirs(os.path.join(dest_tree, 'page'))
 
-    for page in magic_map.pages.values():
+    for page in list(magic_map.pages.values()):
         with open(os.path.join(dest_tree, 'page', str(page.page)), 'w') as p:
             p.write(translator.dump_page(page, gentime=compile_dtm) + '\n')
         # XXX suppress if didn't change since last run XXX
         
-        for room in page.rooms.values():
+        for room in list(page.rooms.values()):
             public_room_id = gen_public_room_id(room.id)
             if not public_room_id:
                 raise ValueError('public room ID generated from %s was empty!' % room.id)
@@ -155,11 +155,11 @@ def make_world(source_trees, dest_tree, creator_from_path=False, ignore_errors=F
                     continue
 
             with open(target_name, 'w') as rm:
-                print "** writing", target_name,"**"
+                print("** writing", target_name,"**")
                 rm.write(translator.dump_room(room, public_id_filter=gen_public_room_id, gentime=compile_dtm) + '\n')
             if room.source_modified_date:
                 #match the source's timestamp
-                print "** setting time stamp **"
+                print("** setting time stamp **")
                 os.utime(target_name, 
                         (time.time(), time.mktime(room.source_modified_date.utctimetuple())))
 
@@ -178,7 +178,7 @@ def make_master_map(source_tree_list, dest_filename, creator_from_path=False, ig
     # (sorry VMS)
     #
     if verbosity:
-        sys.stderr.write("MagicMapCompiler.make_master_map(source_tree={0}, dest_file={1}, creator_from_path={2}, ignore_errors={3}, verbosity={4})\n".format(`source_tree_list`, `dest_filename`, `creator_from_path`, `ignore_errors`, `verbosity`))
+        sys.stderr.write("MagicMapCompiler.make_master_map(source_tree={0}, dest_file={1}, creator_from_path={2}, ignore_errors={3}, verbosity={4})\n".format(repr(source_tree_list), repr(dest_filename), repr(creator_from_path), repr(ignore_errors), repr(verbosity)))
 
     creator_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+r'(\w+)')
     rootdir_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+'\w+$')
@@ -224,11 +224,11 @@ def make_master_map(source_tree_list, dest_filename, creator_from_path=False, ig
                         sys.stderr.write("   "+filename+"\n")
                     try:
                         src_filename = os.path.join(root, filename)
-                        magic_map.add_from_file(open(src_filename), 
+                        magic_map.add_from_file(open(src_filename, encoding='utf-8'), 
                                 creator=creator_name, enforce_creator=enforce_creator, 
                                 source_date=datetime.datetime.utcfromtimestamp(os.stat(src_filename).st_mtime),
                                 verbosity=verbosity)
-                    except Exception, e:
+                    except Exception as e:
                         if ignore_errors:
                             sys.stderr.write('%s: parser error: %s\n' % (src_filename, e))
                         else:
@@ -523,7 +523,7 @@ grestore } def
             ))
             dest_file.write('\n'.join(page.bg))
 
-            for room in page.rooms.values():
+            for room in list(page.rooms.values()):
                 dest_file.write('%---[ {0} ]---\n{1}\n'.format(room.id, '\n'.join(room.map) if isinstance(room.map, list) else (room.map or '')))
             dest_file.write('EndPage\n')
 #    

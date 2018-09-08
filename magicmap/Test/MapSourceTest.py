@@ -28,7 +28,7 @@
 #
 
 import unittest
-import StringIO
+import io
 
 import RagnarokMUD.MagicMapper.MapPage
 from RagnarokMUD.MagicMapper.MapSource import MapSource, MapFileFormatError, DuplicateRoomError, InfiniteLoopError, InvalidRoomPath, IllegalCreatorReference, MapDefSymbol
@@ -49,7 +49,7 @@ class MapSourceTest (unittest.TestCase):
     def _test_tokenizer(self, se_list):
         for source, expected in se_list:
             self.ms._start_tokenizer()
-            self.failUnlessEqual([i for i in self.ms._each_ps_token(source)], expected)
+            self.assertEqual([i for i in self.ms._each_ps_token(source)], expected)
             self.ms._stop_tokenizer()
 
     def test_ps_tokenizer_with_embedded_delims(self):
@@ -68,7 +68,7 @@ class MapSourceTest (unittest.TestCase):
             (MapFileFormatError, '1{2{3 4}'),
             (MapFileFormatError, '1{2{3{4}}5}6}'),
         ):
-            self.failUnlessRaises(ex, run_tok, source)
+            self.assertRaises(ex, run_tok, source)
 
 
     def test_ps_function_tokenizer(self):
@@ -86,7 +86,7 @@ class MapSourceTest (unittest.TestCase):
     def _test_compiler(self, se_list):
         "Given a list of (source, expected_result_list) tuples, try compiling each one and comparing the resulting list from the compiler with the expected value."
         for source, expected in se_list:
-            self.failUnlessEqual(self.ms.compile(source, allow_test=True), expected)
+            self.assertEqual(self.ms.compile(source, allow_test=True), expected)
 
     def _test_compiler_symbols(self, se_list, persistent=False):
         "Given a list of (source, expected_result_list, locals, globals) tuples, try compiling each one and comparing the resulting list from the compiler, as well as testing the resulting dictionaries of local and global symbols."
@@ -105,13 +105,13 @@ class MapSourceTest (unittest.TestCase):
     def _test_float_lists(self, a, x, msg):
         "Recursively test float values"
         if isinstance(x, (list,tuple)):
-            self.failUnlessEqual(len(x), len(a), "Length of lists unequal: actual={0} expected={1} in {2}".format(a, x, msg))
+            self.assertEqual(len(x), len(a), "Length of lists unequal: actual={0} expected={1} in {2}".format(a, x, msg))
             for aa, xx in zip(a,x):
                 self._test_float_lists(aa, xx, msg+'>')
         elif isinstance(x, float):
-            self.failUnlessAlmostEqual(a, x, 5, "{0} != {1} (float compare) in {2}".format(a, x, msg))
+            self.assertAlmostEqual(a, x, 5, "{0} != {1} (float compare) in {2}".format(a, x, msg))
         else:
-            self.failUnlessEqual(a, x, "{0} != {1} in {2}".format(a, x, msg))
+            self.assertEqual(a, x, "{0} != {1} in {2}".format(a, x, msg))
 
     def _test_compiler_float_values(self, se_list):
         '''Like _test_compiler(), but each value is interpreted separately rather than comparing the list.  
@@ -138,14 +138,14 @@ class MapSourceTest (unittest.TestCase):
 
         for source, expected in se_list:
             test_result = self.ms.compile(source, allow_test=True)[0]
-            self.failUnlessEqual(test_result[0], '_T')
-            self.failUnlessEqual(len(test_result)-1, len(expected), 'bad result size {0} vs. {1}'.format(
+            self.assertEqual(test_result[0], '_T')
+            self.assertEqual(len(test_result)-1, len(expected), 'bad result size {0} vs. {1}'.format(
                 test_result, expected))
             for r, ex in zip(test_result[1:], expected):
                 if isinstance(ex, float):
-                    self.failUnlessAlmostEqual(r, ex, 6, "{0} != {1} in result set {2}->{3}".format(r, ex, source, test_result))
+                    self.assertAlmostEqual(r, ex, 6, "{0} != {1} in result set {2}->{3}".format(r, ex, source, test_result))
                 else:
-                    self.failUnlessEqual(r,ex, "{0} != {1} in result set {2}->{3}".format(r, ex, source, test_result))
+                    self.assertEqual(r,ex, "{0} != {1} in result set {2}->{3}".format(r, ex, source, test_result))
 
     def test_compile_vectors(self):
         self._test_compiler((
@@ -224,7 +224,7 @@ class MapSourceTest (unittest.TestCase):
                 ))
 
     def test_bad_compile_show(self):
-        self.failUnlessRaises(MapFileFormatError, self.ms.compile, '(some text) show')
+        self.assertRaises(MapFileFormatError, self.ms.compile, '(some text) show')
 
     def test_compile_round_room(self):
         self._test_compiler((
@@ -331,7 +331,7 @@ show
                 (MapFileFormatError, '()()0 0 0 0 room north door south passage north passage'),
                 (MapFileFormatError, '()()0 0 0 0 room north passage south passage north passage'),
         ):
-            self.failUnlessRaises(exc, self.ms.compile, source)
+            self.assertRaises(exc, self.ms.compile, source)
 
     def test_bad_ps_commands(self):
         for exc, source in (
@@ -342,10 +342,10 @@ show
                 (MapFileFormatError, 'np 0 0 mv 1 1 ln'),
                 (MapFileFormatError, 'stroke'),
         ):
-            self.failUnlessRaises(exc, self.ms.compile, source)
+            self.assertRaises(exc, self.ms.compile, source)
 
     def test_record_parser(self):
-        f = StringIO.StringIO('''
+        f = io.StringIO('''
 #
 # A test input source
 #
@@ -374,39 +374,39 @@ bg:   x1 x2 x3 x4
                 'ref':(123, 456),
                 'also':'/a/b/c\n/d/e/f', 'bg':'x1 x2 x3 x4', 'name':'Full Room'}
         ], self.ms._each_record(f)):
-            self.assertEquals(sorted(expected.keys()), sorted(actual.keys()))
+            self.assertEqual(sorted(expected.keys()), sorted(actual.keys()))
             for k in expected:
-                self.assertEquals(expected[k], actual[k])
+                self.assertEqual(expected[k], actual[k])
         f.close()
 
     def test_inappropriate_continuation(self):
         for dupfield in 'room', 'name', 'page', 'realm', 'orient':
-            f = StringIO.StringIO('room: /a/b/c\n' + dupfield + ': first\n   second\n  third\n')
+            f = io.StringIO('room: /a/b/c\n' + dupfield + ': first\n   second\n  third\n')
             def ff():
                 list(self.ms._each_record(f))
             self.assertRaises(MapFileFormatError, ff)
             f.close()
 
     def test_incorrect_format(self):
-        f = StringIO.StringIO('room: whatever\nfoo bar\n')
+        f = io.StringIO('room: whatever\nfoo bar\n')
         def ff():
             list(self.ms._each_record(f))
         self.assertRaises(MapFileFormatError,  ff)
 
     def test_duplicated_fields(self):
-        f = StringIO.StringIO('room: whatever\npage: 12\npage:13\n')
+        f = io.StringIO('room: whatever\npage: 12\npage:13\n')
         def ff():
             list(self.ms._each_record(f))
         self.assertRaises(MapFileFormatError,  ff)
 
     def test_missing_required_field(self):
-        f = StringIO.StringIO('''
+        f = io.StringIO('''
 page: 12
 room: outofplace
 ''')
         self.assertRaises(MapFileFormatError, MapSource, f)
 
-        f = StringIO.StringIO('''
+        f = io.StringIO('''
 room: another
 realm: note no page number
 ''')
@@ -414,7 +414,7 @@ realm: note no page number
 
     def test_relative_path_with_no_creator(self):
         for name in 'relative-name', 'relative/path', '~/twiddle_path':
-            self.assertRaises(InvalidRoomPath, MapSource, StringIO.StringIO('''
+            self.assertRaises(InvalidRoomPath, MapSource, io.StringIO('''
 room: '''+name+'''
 page: 1
 '''))
@@ -424,12 +424,12 @@ page: 1
             ('/foo//bar//baz', 'foo/bar/baz'),
             ('/players/x/../a/b/c/../d', 'players/a/b/d')
         ):
-            ms = MapSource(StringIO.StringIO('''
+            ms = MapSource(io.StringIO('''
 room: '''+a+'''
 page: 12
 '''))
-            self.assert_(b in ms.room_page, msg="{0} translated to {1} not {2}".format(
-                a, ms.room_page.keys(), b))
+            self.assertTrue(b in ms.room_page, msg="{0} translated to {1} not {2}".format(
+                a, list(ms.room_page.keys()), b))
 
     def test_relative_path_with_creator(self):
         for a,b in (
@@ -441,11 +441,11 @@ page: 12
             ('/absolute/path/to/file','absolute/path/to/file'),
         ):
             ms = MapSource()
-            ms.add_from_file(StringIO.StringIO('''
+            ms.add_from_file(io.StringIO('''
 room: '''+a+'''
 page: 1
 '''), creator='me', enforce_creator=False)
-            self.assert_(b in ms.pages[1].rooms, msg="{0} didn't translate to {1}, got {2}".format(a,b,ms.pages[1].rooms.keys()))
+            self.assertTrue(b in ms.pages[1].rooms, msg="{0} didn't translate to {1}, got {2}".format(a,b,list(ms.pages[1].rooms.keys())))
             
     def test_cross_realm_definition(self):
         for name in (
@@ -454,7 +454,7 @@ page: 1
             '/room/base/path',
         ):
             ms = MapSource()
-            self.assertRaises(IllegalCreatorReference, ms.add_from_file, StringIO.StringIO('''
+            self.assertRaises(IllegalCreatorReference, ms.add_from_file, io.StringIO('''
 room: '''+name+'''
 page: 2
 '''), creator='bbb', enforce_creator=True)
@@ -465,7 +465,7 @@ page: 2
             '~aaa/path',
         ):
             ms = MapSource()
-            self.assertRaises(IllegalCreatorReference, ms.add_from_file, StringIO.StringIO('''
+            self.assertRaises(IllegalCreatorReference, ms.add_from_file, io.StringIO('''
 room: '''+name+'''
 page: 2
 '''), creator=None, enforce_creator=True)
@@ -477,7 +477,7 @@ page: 2
             ('~ccc/path', 'ccc'),
             ('/room/foo/bar', 'Base World Map'),
         ):
-            ms = MapSource(StringIO.StringIO('''
+            ms = MapSource(io.StringIO('''
 room: '''+name+'''
 page: 34
 '''))
@@ -487,7 +487,7 @@ page: 34
 
 
     def test_duplicate_room(self):
-        self.assertRaises(DuplicateRoomError, MapSource, StringIO.StringIO('''
+        self.assertRaises(DuplicateRoomError, MapSource, io.StringIO('''
 room: ~x/one
 page: 1
 
@@ -496,7 +496,7 @@ page: 2
 '''))
 
     def test_reference_point_explicit(self):
-        self.assertEquals(MapSource(StringIO.StringIO('''
+        self.assertEqual(MapSource(io.StringIO('''
 room: ~x/one
 page: 1
 ref:  123 456
@@ -504,7 +504,7 @@ map:  (foo)(bar)111 222 std room
 ''')).pages[1].rooms['players/x/one'].reference_point, (123, 456))
 
     def test_reference_point_room(self):
-        self.assertEquals(MapSource(StringIO.StringIO('''
+        self.assertEqual(MapSource(io.StringIO('''
 room: ~x/one
 page: 1
 map:  (foo)(bar)100 200 std room
@@ -513,7 +513,7 @@ map:  (foo)(bar)100 200 std room
 ''')).pages[1].rooms['players/x/one'].reference_point, (125, 210))
 
     def test_reference_point_round(self):
-        self.assertEquals(MapSource(StringIO.StringIO('''
+        self.assertEqual(MapSource(io.StringIO('''
 room: ~x/one
 page: 1
 map:  (foo)(bar)100 200 stdr round-room
@@ -522,7 +522,7 @@ map:  (foo)(bar)100 200 stdr round-room
 ''')).pages[1].rooms['players/x/one'].reference_point, (100, 200))
 
     def test_reference_point_dot(self):
-        self.assertEquals(MapSource(StringIO.StringIO('''
+        self.assertEqual(MapSource(io.StringIO('''
 room: ~x/one
 page: 1
 map:  [1 2 3 4 5 6 7 8] mazeroom
@@ -532,13 +532,13 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
     def test_get_page(self):
         ms = MapSource()
         p12 = ms.get_page(12)
-        self.assertEquals(sorted(ms.pages.keys()), [12])
-        self.assert_(ms.get_page(12) is p12)
-        self.assertEquals(sorted(ms.pages.keys()), [12])
-        self.assertEquals(p12.page, 12)
+        self.assertEqual(sorted(ms.pages.keys()), [12])
+        self.assertTrue(ms.get_page(12) is p12)
+        self.assertEqual(sorted(ms.pages.keys()), [12])
+        self.assertEqual(p12.page, 12)
         p13 = ms.get_page('13')
-        self.assertEquals(sorted(ms.pages.keys()), [12, 13])
-        self.assertEquals(p13.page, 13)
+        self.assertEqual(sorted(ms.pages.keys()), [12, 13])
+        self.assertEqual(p13.page, 13)
 
     def test_get_page_bad_number(self):
         ms = MapSource()
@@ -549,21 +549,21 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
     def test_load_file(self):
         with open('data/museum.map', 'r') as f:
             ms = MapSource(file=f)
-        self.assertEquals(sorted(ms.pages.keys()), [5, 20])
-        self.assertEquals(ms.pages[5].page, 5)
-        self.assertEquals(ms.pages[20].page, 20)
-        self.assertEquals(ms.pages[5].bg, [])
-        self.assertEquals(ms.pages[20].bg, [
+        self.assertEqual(sorted(ms.pages.keys()), [5, 20])
+        self.assertEqual(ms.pages[5].page, 5)
+        self.assertEqual(ms.pages[20].page, 20)
+        self.assertEqual(ms.pages[5].bg, [])
+        self.assertEqual(ms.pages[20].bg, [
             ['Fi', 36],
             ['S', 0, 0, 'Museum Quest']
         ])
-        self.assertEquals(ms.pages[20].orient, RagnarokMUD.MagicMapper.MapPage.PORTRAIT)
-        self.assertEquals(ms.pages[5].orient, RagnarokMUD.MagicMapper.MapPage.LANDSCAPE)
-        self.assertEquals(ms.pages[20].realm, "Aardvark's Museum--Gateway to Adventureland")
-        self.assertEquals(ms.pages[5].realm, None)
+        self.assertEqual(ms.pages[20].orient, RagnarokMUD.MagicMapper.MapPage.PORTRAIT)
+        self.assertEqual(ms.pages[5].orient, RagnarokMUD.MagicMapper.MapPage.LANDSCAPE)
+        self.assertEqual(ms.pages[20].realm, "Aardvark's Museum--Gateway to Adventureland")
+        self.assertEqual(ms.pages[5].realm, None)
 
-        self.assertEquals(sorted(ms.pages[5].rooms.keys()), ['players/fizban/aardvark/entrance'])
-        self.assertEquals(sorted(ms.pages[20].rooms.keys()), [
+        self.assertEqual(sorted(ms.pages[5].rooms.keys()), ['players/fizban/aardvark/entrance'])
+        self.assertEqual(sorted(ms.pages[20].rooms.keys()), [
             'players/fizban/aardvark/china',
             'players/fizban/aardvark/egypt',
             'players/fizban/aardvark/india',
@@ -572,19 +572,19 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
             'players/fizban/aardvark/rotunda',
             ])
 
-        self.assertEquals(ms.room_page['players/fizban/aardvark/entrance'], 5)
-        self.assertEquals(ms.room_page['players/fizban/aardvark/egypt'], 20)
+        self.assertEqual(ms.room_page['players/fizban/aardvark/entrance'], 5)
+        self.assertEqual(ms.room_page['players/fizban/aardvark/egypt'], 20)
         entrance = ms.pages[5].rooms['players/fizban/aardvark/entrance']
-        self.assertEquals(entrance.map, [
+        self.assertEqual(entrance.map, [
             ['Rp', 380, 430, 50, 20, 'Museum', 'Entrance', [['e', 20]]],
             ['S', 385, 420, '(See p. 20)']
         ])
-        self.assertEquals(entrance.page.page, 5)
+        self.assertEqual(entrance.page.page, 5)
 
         rotunda = ms.pages[20].rooms['players/fizban/aardvark/rotunda']
-        self.assertEquals(rotunda.page.page, 20)
-        self.assertEquals(rotunda.page.realm, "Aardvark's Museum--Gateway to Adventureland")
-        self.assertEquals(rotunda.map, [
+        self.assertEqual(rotunda.page.page, 20)
+        self.assertEqual(rotunda.page.realm, "Aardvark's Museum--Gateway to Adventureland")
+        self.assertEqual(rotunda.map, [
             ['Rop', 395, 335, 50, 20, "Heimdall's", "Path", []],
             ['S', 450, 341, '(See p. 3)'],
             ['Ro', 325, 335, 50, 20, "Museum", "Entrance", [['e', 20], ['w', 20]]],
@@ -696,7 +696,7 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
         ))
                 
     def test_infinite_loop(self):
-        self.failUnlessRaises(InfiniteLoopError, self.ms.compile, '{ clear } loop')
+        self.assertRaises(InfiniteLoopError, self.ms.compile, '{ clear } loop')
 
     def test_for_loop(self):
         self._test_compiler((
@@ -735,7 +735,7 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
         for ex, src in (
             (ValueError, '-167.5 sqrt'),
         ):
-            self.failUnlessRaises(ex, self.ms.compile, src)
+            self.assertRaises(ex, self.ms.compile, src)
 
     def test_current_point(self):
         self._test_compiler((
@@ -744,9 +744,9 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
 
     def test_symbolic_string_names(self):
         legal_glyphs = {
-            0320: '[--]', 0261: '[-]',  0242: '[/c]', 0262: '[+]',  0263: '[++]',
-            0252: '[``]', 0272: "['']", 0267: '[*]',  0341: '[AE]', 0361: '[ae]',
-            0247: '[S]',  0266: '[P]',  0253: '[<<]', 0273: '[>>]', 0261: '-',
+            0o320: '[--]', 0o261: '[-]',  0o242: '[/c]', 0o262: '[+]',  0o263: '[++]',
+            0o252: '[``]', 0o272: "['']", 0o267: '[*]',  0o341: '[AE]', 0o361: '[ae]',
+            0o247: '[S]',  0o266: '[P]',  0o253: '[<<]', 0o273: '[>>]', 0o261: '-',
             '\\': '\\',   '(':  '(',    ')':  ')',   
         }
         for ch in range(256):
@@ -769,14 +769,14 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
     def test_int_bases(self):
         self._test_compiler((
             ('(dec) 1 10 20 10#30 10#40 6 __test__', [['_T', 'dec', 1, 10, 20, 30, 40]]),
-            ('(oct) 1 10 20 8#30 8#40   6 __test__', [['_T', 'oct', 1, 10, 20, 030, 040]]),
+            ('(oct) 1 10 20 8#30 8#40   6 __test__', [['_T', 'oct', 1, 10, 20, 0o30, 0o40]]),
             ('(hex) 1 10 20 16#30 16#4e 6 __test__', [['_T', 'hex', 1, 10, 20, 0x30, 0x4e]]),
             ('(bin) 1 2#1000 2#0101     4 __test__', [['_T', 'bin', 1, 8, 5]]),
             ('0#000 1 __test__', [['_T', 0]]),
             ('36#000 36#Z 2 __test__', [['_T', 0, 35]]),
         ))
         for src in ('37#000', '1#000'):
-            self.failUnlessRaises(MapFileFormatError, self.ms.compile, src)
+            self.assertRaises(MapFileFormatError, self.ms.compile, src)
 
     def test_numbers(self):
         self._test_compiler_floats((
@@ -791,7 +791,7 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
                 'np 1 2 mv 3 4 ln lastpath stroke',
                 'np 1 2 mv 3 4 ln stroke np lastpath stroke',
         ):
-            self.failUnlessRaises(MapFileFormatError, self.ms.compile, src)
+            self.assertRaises(MapFileFormatError, self.ms.compile, src)
 
     def test_curveto(self):
         self._test_compiler((
@@ -862,7 +862,7 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
 
     def test_no_currrent_point(self):
         for src in ('np 4 3 lineto stroke', 'np 4 3 rlineto stroke'):
-            self.failUnlessRaises(MapFileFormatError, self.ms.compile, src)
+            self.assertRaises(MapFileFormatError, self.ms.compile, src)
 
     def test_symbol_name(self):
         self._test_compiler((
@@ -904,7 +904,7 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
             '/eric 444 sdef',
             '$undefined',
         ):
-            self.failUnlessRaises(MapFileFormatError, self.ms.compile, src)
+            self.assertRaises(MapFileFormatError, self.ms.compile, src)
 
 # TODO
 #   arc[n]

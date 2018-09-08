@@ -50,16 +50,16 @@ class ConversionScriptTest (unittest.TestCase):
         if os.path.exists(DST):
             shutil.rmtree(DST)
 
-        os.mkdir(DST, 0755)
-        make_world(source_tree=SRC, dest_tree=DST, enforce_creator=False)
+        os.mkdir(DST, 0o755)
+        make_world(source_trees=[SRC], dest_tree=DST, enforce_creator=False)
         self.assertTreesEqual(DST, CMP)
 
     def test_map_conversion_with_creators(self):
         if os.path.exists(DSTC):
             shutil.rmtree(DSTC)
 
-        os.mkdir(DSTC, 0755)
-        make_world(source_tree=SRC, dest_tree=DSTC, creator_from_path=True, verbosity=5)
+        os.mkdir(DSTC, 0o755)
+        make_world(source_trees=[SRC], dest_tree=DSTC, creator_from_path=True, verbosity=5)
         self.assertTreesEqual(DSTC, CMPC)
 
     def assertTreesEqual(self, actual, expected):
@@ -107,7 +107,7 @@ class ConversionScriptTest (unittest.TestCase):
                     raise DataFormatError('Incorrect file line count (was %d, expected %d) in %s' %
                             (len(file_contents), datalen+2, path))
 
-                self.checksum = hashlib.sha1(''.join(file_contents[:-1])).digest()
+                self.checksum = hashlib.sha1((''.join(file_contents[:-1])).encode('utf-8')).digest()
 
                 if file_contents[-1][0] != '%':
                     raise DataFormatError('Corrupt file (%s): unexpected final line: %s' %
@@ -117,7 +117,7 @@ class ConversionScriptTest (unittest.TestCase):
                     self.claimed_checksum = base64.b64decode(claimed_checksum)
                     self.gentime = datetime.datetime.strptime(gentime, '%Y-%m-%dT%H:%M:%S.%f')
                     self.mtime   = datetime.datetime.strptime(mtime,   '%Y-%m-%dT%H:%M:%S.%f')
-                except Exception, e:
+                except Exception as e:
                     raise DataFormatError('Corrupt file (%s): Cannot parse final line: %s (%s)' %
                             (path, file_contents[-1], e))
 
@@ -153,13 +153,13 @@ class ConversionScriptTest (unittest.TestCase):
 
             for filename in filenames:
                 path_key = os.path.join(relative_dir,filename)
-                self.assert_(path_key in expected_file_info, 'Generated file "'+os.path.join(dirpath,filename)+'" not found in known-good directory.')
+                self.assertTrue(path_key in expected_file_info, 'Generated file "'+os.path.join(dirpath,filename)+'" not found in known-good directory.')
                 actual_file_info = FileInfo(os.path.join(dirpath,filename))
-                self.assertEquals(actual_file_info.checksum, expected_file_info[path_key].checksum, 'File checksum mismatch: key={0},file={1}'.format(path_key,os.path.join(dirpath,filename)))
+                self.assertEqual(actual_file_info.checksum, expected_file_info[path_key].checksum, 'File checksum mismatch: key={0},file={1}'.format(path_key,os.path.join(dirpath,filename)))
                 del expected_file_info[path_key]
             
-        self.assertEquals(len(expected_file_info), 0, 'Failed to generate all files: %s\n%d unmatched files total' % (
-            '\n'.join(expected_file_info.keys()),
+        self.assertEqual(len(expected_file_info), 0, 'Failed to generate all files: %s\n%d unmatched files total' % (
+            '\n'.join(list(expected_file_info.keys())),
             len(expected_file_info)))
 
 # XXX only update new files

@@ -71,7 +71,7 @@ class MapManager (object):
                 config=config)
     
     def diag_logger(self, level, prog, total, msg):
-        print "XXX [{}] {}/{} {}".format(level, prog, total, msg)
+        print("XXX [{}] {}/{} {}".format(level, prog, total, msg))
 
     def open(self, player_id):
         if self.db is not None:

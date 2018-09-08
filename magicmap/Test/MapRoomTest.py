@@ -34,6 +34,6 @@ from RagnarokMUD.MagicMapper.MapPage import MapPage
 class MapRoomTest (unittest.TestCase):
     def test_cons(self):
         r = MapRoom('aaa',MapPage(1),'Test Room')
-        self.assertEquals(r.id, 'aaa')
-        self.assertEquals(r.page.page, 1)
-        self.assertEquals(r.name, 'Test Room')
+        self.assertEqual(r.id, 'aaa')
+        self.assertEqual(r.page.page, 1)
+        self.assertEqual(r.name, 'Test Room')

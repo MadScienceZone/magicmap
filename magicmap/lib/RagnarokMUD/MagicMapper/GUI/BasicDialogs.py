@@ -31,10 +31,10 @@ import wx
 import os.path
 
 def display_splash_screen(image_file_name):
-    print "Loading", os.path.join(
+    print("Loading", os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
                 'images',
-                image_file_name)
+                image_file_name))
     wx.SplashScreen(
         wx.Image(
             os.path.join(

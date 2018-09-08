@@ -32,7 +32,7 @@ import os, os.path
 from RagnarokMUD.MagicMapper.MapCacheManager import MapCacheManager, CacheManagerError
 import datetime
 import shutil
-import StringIO
+import io
 import time
 
 CACHEDIR = os.path.join('data','testcache')
@@ -51,17 +51,17 @@ class MapCacheManagerTest (unittest.TestCase):
         del self.cm
 
     def test_fn_1(self):
-        self.assertEquals(self.cm._encode_filename('rmO_aPzcZbw4g_HlzLxk8k'), ('_R', '_R_M', '_R_MO_5F_AP_Z_CZ_B_W4_G_5FH_L_ZL_X_K8_K.MMC'))
+        self.assertEqual(self.cm._encode_filename('rmO_aPzcZbw4g_HlzLxk8k'), ('_R', '_R_M', '_R_MO_5F_AP_Z_CZ_B_W4_G_5FH_L_ZL_X_K8_K.MMC'))
     def test_fn_2(self):
-        self.assertEquals(self.cm._encode_filename('-cRDWjIFbaTKhi4IEUIr6F'), ('_2D', '_2D_C', '_2D_CRDW_JIF_B_ATK_H_I4IEUI_R6F.MMC'))
+        self.assertEqual(self.cm._encode_filename('-cRDWjIFbaTKhi4IEUIr6F'), ('_2D', '_2D_C', '_2D_CRDW_JIF_B_ATK_H_I4IEUI_R6F.MMC'))
     def test_fn_3(self):
-        self.assertEquals(self.cm._encode_filename('5B7r7QXftBdRNJEBK0YFPV'), ('5', '5B', '5B7_R7QX_F_TB_DRNJEBK0YFPV.MMC'))
+        self.assertEqual(self.cm._encode_filename('5B7r7QXftBdRNJEBK0YFPV'), ('5', '5B', '5B7_R7QX_F_TB_DRNJEBK0YFPV.MMC'))
 
     def test_store(self):
-        self.cm.store('Test', StringIO.StringIO('''This is a test file.
+        self.cm.store('Test', io.StringIO('''This is a test file.
 
 This is only a test.'''))
-        self.assertEquals(self.cm.retrieve('Test')[0].read(), '''This is a test file.
+        self.assertEqual(self.cm.retrieve('Test')[0].read(), '''This is a test file.
 
 This is only a test.''')
         
@@ -70,10 +70,10 @@ This is only a test.''')
 
     def test_invalid_dir(self):
         open(os.path.join('data','testcache','F'), 'w').close()
-        self.assertRaises(CacheManagerError, self.cm.store, 'Fail', StringIO.StringIO(''))
+        self.assertRaises(CacheManagerError, self.cm.store, 'Fail', io.StringIO(''))
 
     def test_cache_expired(self):
-        self.cm.store('TimeTest', StringIO.StringIO('''Has this timed out?'''))
+        self.cm.store('TimeTest', io.StringIO('''Has this timed out?'''))
         old_age = self.cm.retrieve('TimeTest')[1]
         time.sleep(2)
         new_age = self.cm.retrieve('TimeTest')[1]

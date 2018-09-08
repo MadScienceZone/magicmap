@@ -44,8 +44,8 @@ import os.path
 class ConfigurationManagerTest (unittest.TestCase):
     def test_defaults(self):
         c = ConfigurationManager()
-        self.failUnlessAlmostEqual(c.getfloat('rendering', 'font_magnification'), 0.85)
+        self.assertAlmostEqual(c.getfloat('rendering', 'font_magnification'), 0.85)
 
     def test_load(self):
         c = ConfigurationManager([os.path.join('data', 'test_load.ini')])
-        self.failUnlessAlmostEqual(c.getfloat('rendering', 'font_magnification'), 1.123)
+        self.assertAlmostEqual(c.getfloat('rendering', 'font_magnification'), 1.123)

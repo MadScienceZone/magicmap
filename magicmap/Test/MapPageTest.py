@@ -33,17 +33,17 @@ from RagnarokMUD.MagicMapper.MapPage import MapPage, PORTRAIT, LANDSCAPE, PageOr
 class MapPageTest (unittest.TestCase):
     def test_cons(self):
         p = MapPage(27, realm='Xanadu', orient=LANDSCAPE, bg=None)
-        self.assertEquals(p.page, 27)
-        self.assertEquals(p.realm, 'Xanadu')
-        self.assertEquals(p.orient, LANDSCAPE)
-        self.assertEquals(p.bg, [])
+        self.assertEqual(p.page, 27)
+        self.assertEqual(p.realm, 'Xanadu')
+        self.assertEqual(p.orient, LANDSCAPE)
+        self.assertEqual(p.bg, [])
 
     def test_defs(self):
         p=MapPage(88)
-        self.assertEquals(p.page, 88)
-        self.assert_(p.realm is None)
-        self.assertEquals(p.orient, PORTRAIT)
-        self.assertEquals(p.bg, [])
+        self.assertEqual(p.page, 88)
+        self.assertTrue(p.realm is None)
+        self.assertEqual(p.orient, PORTRAIT)
+        self.assertEqual(p.bg, [])
 
     def test_cons_errors(self):
         self.assertRaises(ValueError, MapPage, 'A1')
@@ -52,21 +52,21 @@ class MapPageTest (unittest.TestCase):
 
     def test_orient_flip(self):
         p=MapPage(1)
-        self.assertEquals(p.orient, PORTRAIT)
+        self.assertEqual(p.orient, PORTRAIT)
         p.orient=PORTRAIT
-        self.assertEquals(p.orient, PORTRAIT)
+        self.assertEqual(p.orient, PORTRAIT)
         p.orient=PORTRAIT
-        self.assertEquals(p.orient, PORTRAIT)
+        self.assertEqual(p.orient, PORTRAIT)
         def f(v):
             p.orient=v
         self.assertRaises(PageOrientationViolationError, f, LANDSCAPE)
 
         p=MapPage(2)
-        self.assertEquals(p.orient, PORTRAIT)
+        self.assertEqual(p.orient, PORTRAIT)
         p.orient=LANDSCAPE
-        self.assertEquals(p.orient, LANDSCAPE)
+        self.assertEqual(p.orient, LANDSCAPE)
         p.orient=LANDSCAPE
-        self.assertEquals(p.orient, LANDSCAPE)
+        self.assertEqual(p.orient, LANDSCAPE)
         def f(v):
             p.orient=v
         self.assertRaises(PageOrientationViolationError, f, PORTRAIT)

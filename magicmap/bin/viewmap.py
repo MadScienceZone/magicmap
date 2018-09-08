@@ -4,7 +4,7 @@
 # RAGNAROK MAGIC MAPPER SOURCE CODE: mapping client
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2018 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.
@@ -30,7 +30,7 @@
 
 import sys
 import os, os.path
-import wx
+import tkinter
 import optparse
 import platform
 
@@ -61,7 +61,7 @@ op.add_option('-v', '--verbose',      action='count',      help='Increase verbos
 
 opt, cmd_map_file_list = op.parse_args()
 
-print """
+print("""
              Ragnarok Magic Map 6.0b1 Preview Tool (viewmap)
                   *** PRE-RELEASE PREVIEW VERSION ***
 
@@ -72,7 +72,7 @@ process.
 
 Error messages about your map pages will show up here as well.  Eventually
 they will be put in a GUI window for you.
-"""
+""")
 
 class MapPreviewApp(wx.App):
     def OnInit(self):

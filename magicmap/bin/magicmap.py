@@ -66,7 +66,7 @@ opt, extra_args = op.parse_args()
 if extra_args:
     op.error("Extra non-option arguments")
 
-print """
+print("""
                   Ragnarok Magic Map 6.0b1 (magicmap)
                   *** PRE-RELEASE PREVIEW VERSION ***
 
@@ -77,7 +77,7 @@ process.
 
 Error messages about your map pages will show up here as well.  Eventually
 they will be put in a GUI window for you.
-"""
+""")
 #
 # ConfigurationManager
 # MapClientApp
@@ -127,7 +127,7 @@ running it with the --help option.''')
                             config.get('proxy', 'mud_proxy_server'),
                             config.getint('proxy', 'mud_proxy_port'))
             except Exception as err:
-                print "XXX Unable to set proxy: {}".format(err)
+                print("XXX Unable to set proxy: {}".format(err))
 
         self.Bind(wx.EVT_IDLE, self.OnIdle)
         return True

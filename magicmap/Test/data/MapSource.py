@@ -337,7 +337,7 @@ class MapSource (object):
             for required_field in 'room', 'page':
                 if required_field not in record:
                     raise MapFileFormatError('Map source file record does not contain a "'
-                            +required_field+'" field: ' + `record`)
+                            +required_field+'" field: ' + repr(record))
             #
             # set up containing page first
             #
@@ -359,7 +359,7 @@ class MapSource (object):
                 page.orient = LANDSCAPE if 'land' in record['orient'] else PORTRAIT
 
             if record['room'] in self.room_page:
-                raise DuplicateRoomError('Room '+record['room']+' was already defined (on page '+`self.room_page[record['room']]`+')')
+                raise DuplicateRoomError('Room '+record['room']+' was already defined (on page '+repr(self.room_page[record['room']])+')')
 
             self.room_page[record['room']] = page.page
             page.add_room(MapRoom(record['room'], page, record.get('name'), 
@@ -539,7 +539,7 @@ class MapSource (object):
                 raise MapFileFormatError('Unrecognized map drawing command "'+ ps_token + '".')
 
         if self.stack:
-            raise MapFileFormatError('Extra values in map definition with nowhere to go: ' + `self.stack`)
+            raise MapFileFormatError('Extra values in map definition with nowhere to go: ' + repr(self.stack))
         if self.drawing_mode_list is not None:
             raise MapFileFormatError('Drawing path not completed (missing "stroke" or "fill"?)')
         return object
@@ -860,9 +860,9 @@ if __name__ == '__main__':
                     page_attrs[pg]['orient'] = record['orient']
                 if 'map' in record:
                     page_rooms[pg].append(record['map'])
-        print "%s: pg=%s %d rooms" % (
+        print("%s: pg=%s %d rooms" % (
                 input_file, sorted(page_bg.keys()), 
-                sum([len(page_rooms[i]) for i in page_rooms]))
+                sum([len(page_rooms[i]) for i in page_rooms])))
     for page in page_bg:
         with open("Page_"+page+".ps", "w") as dest:
             dest.write("% Page " + page + "\n")

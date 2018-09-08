@@ -28,13 +28,13 @@
 # risk of any kind from, the correct operation of this software.
 #
 
-import ConfigParser
+import configparser
 import os.path, sys
 
 class InvalidHomeDirectory (Exception): pass
-class ConfigurationManager (ConfigParser.SafeConfigParser):
+class ConfigurationManager (configparser.SafeConfigParser):
     def __init__(self, ini_list=None):
-        ConfigParser.SafeConfigParser.__init__(self)
+        configparser.SafeConfigParser.__init__(self)
         self._ini_file_path = None
         #
         # defaults
@@ -83,9 +83,9 @@ class ConfigurationManager (ConfigParser.SafeConfigParser):
                 'server': {
                     'base_url':             'http://www.rag.com/magicmap',
                 },
-        }.iteritems():
+        }.items():
             self.add_section(section_name)
-            for field_name, field_value in section_contents.iteritems():
+            for field_name, field_value in section_contents.items():
                 self.set(section_name, field_name, field_value)
 
         self._ini_file_path = os.path.join(my_home_dir, 'MagicMapper.ini')

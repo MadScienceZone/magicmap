@@ -398,22 +398,22 @@ class MapCanvas (wx.ScrolledWindow):
 
     def DrawMapText(self, dc, x, y, text, center_on_xy=False):
         "[S, x, y, text] -> text drawn at (x,y) in current font/color"
-        utext = unicode()
+        utext = str()
         translation_table = {
-                '\320': unichr(0x2014),  # em dash ---
-                '\261': unichr(0x2013),  # en dash --
-                '\242': unichr(0x00a2),  # cent sign
-                '\262': unichr(0x2020),  # dagger
-                '\263': unichr(0x2021),  # double dagger
-                '\252': unichr(0x201c),  # open quotes  ``
-                '\272': unichr(0x201d),  # close quotes ''
-                '\267': unichr(0x2022),  # bullet
-                '\341': unichr(0x01fc),  # AE
-                '\361': unichr(0x00e6),  # ae
-                '\247': unichr(0x00a7),  # section
-                '\266': unichr(0x00b6),  # paragraph
-                '\253': unichr(0x00ab),  # <<
-                '\273': unichr(0x00bb),  # >>
+                '\320': chr(0x2014),  # em dash ---
+                '\261': chr(0x2013),  # en dash --
+                '\242': chr(0x00a2),  # cent sign
+                '\262': chr(0x2020),  # dagger
+                '\263': chr(0x2021),  # double dagger
+                '\252': chr(0x201c),  # open quotes  ``
+                '\272': chr(0x201d),  # close quotes ''
+                '\267': chr(0x2022),  # bullet
+                '\341': chr(0x01fc),  # AE
+                '\361': chr(0x00e6),  # ae
+                '\247': chr(0x00a7),  # section
+                '\266': chr(0x00b6),  # paragraph
+                '\253': chr(0x00ab),  # <<
+                '\273': chr(0x00bb),  # >>
         }
         for ch in text:
             if ch in translation_table:
@@ -618,7 +618,7 @@ class MapCanvas (wx.ScrolledWindow):
             )
             self._render_map_element_list(dc, '{0}, Background'.format(page_context), self.page_obj.bg)
 
-            for room in self.page_obj.rooms.values():
+            for room in list(self.page_obj.rooms.values()):
                 self._render_map_element_list(
                         dc, 
                         '{0}, Room {1}{2}'.format(

@@ -218,8 +218,8 @@ class AnsiParser (object):
             try:
                 f(self, *args, **kw)
             except Exception as err:
-                print "XXX Error in {} call: {}".format(
-                        f.__name__, err)
+                print("XXX Error in {} call: {}".format(
+                        f.__name__, err))
         return wrapper
 
     @trapErrors
@@ -234,7 +234,7 @@ class AnsiParser (object):
 
     @trapErrors
     def handle_tracking_position(self, id=None):
-        print "XXX handle_tracking_position(id={})".format(id)
+        print("XXX handle_tracking_position(id={})".format(id))
         if self.target_viewer:
             self.target_viewer.tracking_position(id)
 
@@ -247,7 +247,7 @@ class AnsiParser (object):
     def handle_gauge_update(self): pass
     def handle_gauge_destroy(self): pass
     def handle_image(self, id):
-        print "XXX display inline image {}".format(id)
+        print("XXX display inline image {}".format(id))
 
     def handle_debug(self):
         # in the production code, we don't.

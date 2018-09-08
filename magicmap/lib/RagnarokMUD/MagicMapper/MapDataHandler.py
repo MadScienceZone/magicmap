@@ -31,7 +31,7 @@
 from RagnarokMUD.MagicMapper.MapPage import MapPage, LANDSCAPE, PORTRAIT
 from RagnarokMUD.MagicMapper.MapRoom import MapRoom
 from RagnarokMUD.MagicMapper.Local   import gen_public_room_id
-import urllib, hashlib, base64, textwrap, datetime
+import urllib.request, urllib.parse, urllib.error, hashlib, base64, textwrap, datetime
 
 DATA_FORMAT_VERSION = 6
 
@@ -73,12 +73,12 @@ class MapDataHandler (object):
             page.page,
             'L' if page.orient==LANDSCAPE else 'P',
             self.encode_text(page.realm),
-            self.encode_text_list(filter(None, page.creators)),
+            self.encode_text_list([_f for _f in page.creators if _f]),
             len(bgdata)
         )
 
         return '\n'.join([preamble]+bgdata+[
-            '%'+base64.b64encode(hashlib.sha1('\n'.join([preamble]+bgdata)+'\n').digest())+' '+
+            '%'+base64.b64encode(hashlib.sha1(('\n'.join([preamble]+bgdata)+'\n').encode('utf-8')).digest()).decode('utf-8')+' '+
             (gentime or page.source_compiled_date or datetime.datetime.now()).strftime('%Y-%m-%dT%H:%M:%S.%f')+' '+
             (mtime   or page.source_modified_date or datetime.datetime.now()).strftime('%Y-%m-%dT%H:%M:%S.%f')
         ])
@@ -99,10 +99,10 @@ class MapDataHandler (object):
             public_id_filter = lambda i: i
 
         mapdata = self.encode_map_elements(room.map)
-        print "Room {0} ({1}):".format(room.id, public_id_filter(room.id))
+        print("Room {0} ({1}):".format(room.id, public_id_filter(room.id)))
         if room.also is not None:
-            for a in filter(None, room.also):
-                print "  -- also {0} ({1})".format(a, public_id_filter(a))
+            for a in [_f for _f in room.also if _f]:
+                print("  -- also {0} ({1})".format(a, public_id_filter(a)))
         preamble = 'R6 %s %d %s %s %d %d %d' % (
             self.encode_text(public_id_filter(room.id)),
             room.page.page,
@@ -115,7 +115,7 @@ class MapDataHandler (object):
         )
 
         return '\n'.join([preamble] + mapdata + [
-            '%'+base64.b64encode(hashlib.sha1('\n'.join([preamble]+mapdata)+'\n').digest())+' '+
+            '%'+base64.b64encode(hashlib.sha1(('\n'.join([preamble]+mapdata)+'\n').encode('utf-8')).digest()).decode('utf-8')+' '+
             (gentime or room.source_compiled_date or datetime.datetime.now()).strftime('%Y-%m-%dT%H:%M:%S.%f')+' '+
             (mtime   or room.source_modified_date or datetime.datetime.now()).strftime('%Y-%m-%dT%H:%M:%S.%f')
         ])
@@ -144,7 +144,7 @@ class MapDataHandler (object):
                 elif isinstance(element, float):
                     output_list.append(str(round(element, 5)))
                 elif not isinstance(element, str):
-                    raise TypeError("Can't encode "+`element`+" (unsupported data type)")
+                    raise TypeError("Can't encode "+repr(element)+" (unsupported data type)")
                 else:
                     output_list.append(self.encode_text(element))
 
@@ -161,9 +161,9 @@ class MapDataHandler (object):
             return '/'
 
         if text[0] in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_':
-            return urllib.quote_plus(text, '/')
+            return urllib.parse.quote_plus(text, '/', encoding='utf-8')
         else:
-            return '/'+urllib.quote_plus(text, '/')
+            return '/'+urllib.parse.quote_plus(text, '/', encoding='utf-8')
 
     def encode_text_list(self, list):
         "Take list of strings and return marshalled version which has no spaces inside it."
@@ -179,7 +179,7 @@ class MapDataHandler (object):
 
     def _parse_header(self, header):
         "Parse out the encoded fields of a header line and return them as a list of values."
-        return map(self.decode_value, header.split())
+        return list(map(self.decode_value, header.split()))
 
     def decode_value(self, encoded_value):
         "Given an encoded value, return the actual data value, or None if no value given"
@@ -199,8 +199,8 @@ class MapDataHandler (object):
             return ''
         if sentinel == '/' or 'A' <= sentinel <= 'Z' or 'a' <= sentinel <= 'z' or sentinel == '_':
             if sentinel == '/':
-                return urllib.unquote_plus(encoded_value[1:])
-            return urllib.unquote_plus(encoded_value)
+                return urllib.parse.unquote_plus(encoded_value[1:], encoding='utf-8')
+            return urllib.parse.unquote_plus(encoded_value, encoding='utf-8')
         #
         # @[str[,...]]  String list
         #
@@ -214,9 +214,9 @@ class MapDataHandler (object):
                     # even though the spec demands it to be ,/,
                     output.append('')
                 elif element[0] == '/':
-                    output.append(urllib.unquote_plus(element[1:]))
+                    output.append(urllib.parse.unquote_plus(element[1:], encoding='utf-8'))
                 else:
-                    output.append(urllib.unquote_plus(element))
+                    output.append(urllib.parse.unquote_plus(element, encoding='utf-8'))
             return output
         #
         # Integer or float values
@@ -272,8 +272,6 @@ class MapDataHandler (object):
             count -= 1
 
         return v
-
-
     
     def parse_page_header(self, header):
         "Read page header line, return dictionary of page attributes"
@@ -294,7 +292,7 @@ class MapDataHandler (object):
 
         for idx,tp in enumerate((str, int, str, str, list, int)):
             if not isinstance(fields[idx], tp):
-                raise InvalidPageHeader('Page header field #%d (%s) type mismatch' % (idx, `fields[idx]`))
+                raise InvalidPageHeader('Page header field #%d (%s) type mismatch' % (idx, repr(fields[idx])))
 
         if fields[2] not in ('L','P'):
             raise InvalidPageHeader('Page orientation "'+fields[2]+'" not recognized.')
@@ -327,7 +325,7 @@ class MapDataHandler (object):
 
         for idx,tp in enumerate((str, str, int, str, list, (int,float), (int,float), int)):
             if not isinstance(fields[idx], tp):
-                raise InvalidRoomHeader('Room header field #%d (%s) type mismatch' % (idx, `fields[idx]`))
+                raise InvalidRoomHeader('Room header field #%d (%s) type mismatch' % (idx, repr(fields[idx])))
 
         if fields[5] == 0 and fields[6] == 0:
             ref = None
@@ -360,7 +358,7 @@ class MapDataHandler (object):
                     compiled = datetime.datetime.strptime(fields[1], '%Y-%m-%dT%H:%M:%S.%f'),
                     modified = datetime.datetime.strptime(fields[2], '%Y-%m-%dT%H:%M:%S.%f'),
             )
-        except Exception, e:
+        except Exception as e:
             raise InvalidMapDataFooter('Unable to understand footer line: "%s" (%s)' % (footer, e))
 
     def load_page_file(self, fileobj):
@@ -387,7 +385,7 @@ class MapDataHandler (object):
             if extra_line.strip():
                 raise MapDataLengthError('Extra line(s) after end of data: ' + extra_line)
 
-        s1 = hashlib.sha1(''.join(lines[:header['bglines']+1])).digest()
+        s1 = hashlib.sha1((''.join(lines[:header['bglines']+1])).encode('utf-8')).digest()
         if s1 != footer['checksum']:
             raise MapDataChecksumError('Page data checksum error (was %s, expected %s).' % (
                 base64.b64encode(s1), base64.b64encode(footer['checksum'])))
@@ -420,7 +418,7 @@ class MapDataHandler (object):
             if extra_line.strip():
                 raise MapDataLengthError('Extra line(s) after end of data: ' + extra_line)
 
-        s1 = hashlib.sha1(''.join(lines[:header['objlines']+1])).digest()
+        s1 = hashlib.sha1((''.join(lines[:header['objlines']+1])).encode('utf-8')).digest()
         if s1 != footer['checksum']:
             raise MapDataChecksumError('Room data checksum error (was %s, expected %s).' % (
                 base64.b64encode(s1), base64.b64encode(footer['checksum'])))

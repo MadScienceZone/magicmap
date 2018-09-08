@@ -22,7 +22,7 @@ def make_bezier(xys):
             tpowers = (t**i for i in range(n))
             upowers = reversed([(1-t)**i for i in range(n)])
             coefs = [c*a*b for c,a,b in zip(combinations, tpowers, upowers)]
-            result.append(tuple(sum([coef*p for coef,p in zip(coefs,ps)]) for ps in zip(*xys)))
+            result.append(tuple(sum([coef*p for coef,p in zip(coefs,ps)]) for ps in list(zip(*xys))))
         return result
 
     return bezier

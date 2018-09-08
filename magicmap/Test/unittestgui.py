@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # vi:set ai sm ts=4 sw=4 expandtab:
 """
 GUI framework and application for use with Python unit testing framework.
@@ -15,6 +15,8 @@ and disclaimer are retained in their original form.
 
 Modified slightly 2011 Steve Willoughby to accommodate long error text
 strings.
+
+Modified slightly 2018 Steve Willoughby to work with Python 3.
 
 IN NO EVENT SHALL THE AUTHOR BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
 SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF
@@ -33,12 +35,12 @@ __version__ = "$Revision: 1.7 $"[11:-2]
 
 import unittest
 import sys
-import Tkinter
-import tkMessageBox
+import tkinter
+import tkinter.messagebox
 import traceback
 
 import string
-tk = Tkinter # Alternative to the messy 'from Tkinter import *' often seen
+tk = tkinter # Alternative to the messy 'from Tkinter import *' often seen
 
 
 ##############################################################################
@@ -55,7 +57,7 @@ class BaseGUITestRunner:
         self.currentResult = None
         self.running = 0
         self.__rollbackImporter = None
-        apply(self.initGUI, args, kwargs)
+        self.initGUI(*args, **kwargs)
 
     def getSelectedTestName(self):
         "Override to return the name of the test selected to be run"
@@ -79,7 +81,7 @@ class BaseGUITestRunner:
             test = unittest.defaultTestLoader.loadTestsFromName(testName)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
-            apply(traceback.print_exception,sys.exc_info())
+            traceback.print_exception(*sys.exc_info())
             self.errorDialog("Unable to run test '%s'" % testName,
                              "Error loading specified test: %s, %s" % \
                              (exc_type, exc_value))
@@ -158,8 +160,8 @@ class RollbackImporter:
         self.previousModules = sys.modules.copy()
         
     def rollbackImports(self):
-        for modname in sys.modules.keys():
-            if not self.previousModules.has_key(modname):
+        for modname in list(sys.modules.keys()):
+            if modname not in self.previousModules:
                 # Force reload when modname next imported
                 del(sys.modules[modname])
 
@@ -287,7 +289,7 @@ class TkTestRunner(BaseGUITestRunner):
         return self.suiteNameVar.get()
 
     def errorDialog(self, title, message):
-        tkMessageBox.showerror(parent=self.root, title=title,
+        tkinter.messagebox.showerror(parent=self.root, title=title,
                                message=message)
 
     def notifyRunning(self):
@@ -335,11 +337,11 @@ class TkTestRunner(BaseGUITestRunner):
         self.progressBar.setProgressFraction(fractionDone, fillColor)
 
     def showAboutDialog(self):
-        tkMessageBox.showinfo(parent=self.root, title="About PyUnit",
+        tkinter.messagebox.showinfo(parent=self.root, title="About PyUnit",
                               message=_ABOUT_TEXT)
 
     def showHelpDialog(self):
-        tkMessageBox.showinfo(parent=self.root, title="PyUnit help",
+        tkinter.messagebox.showinfo(parent=self.root, title="PyUnit help",
                               message=_HELP_TEXT)
 
     def showSelectedError(self):
@@ -353,7 +355,7 @@ class TkTestRunner(BaseGUITestRunner):
         test, error = self.errorInfo[selected]
         tk.Label(window, text=str(test),
                  foreground="red", justify=tk.LEFT).pack(anchor=tk.W)
-        tracebackLines = apply(traceback.format_exception, error + (10,))
+        tracebackLines = traceback.format_exception(error, 10)
         #tracebackText = string.join(tracebackLines,'')
         #tk.Label(window, text=tracebackText, justify=tk.LEFT).pack()
         tw = tk.Text(window, wrap=tk.WORD, relief=tk.FLAT)
@@ -381,7 +383,7 @@ class ProgressBar(tk.Frame):
     the given colour."""
 
     def __init__(self, *args, **kwargs):
-        apply(tk.Frame.__init__, (self,) + args, kwargs)
+        tk.Frame.__init__(self, *args, **kwargs)
         self.canvas = tk.Canvas(self, height='20', width='60',
                                 background='white', borderwidth=3)
         self.canvas.pack(fill=tk.X, expand=1)

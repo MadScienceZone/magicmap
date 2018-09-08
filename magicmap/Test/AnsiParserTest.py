@@ -79,89 +79,89 @@ class AnsiParserTest (unittest.TestCase):
         self.ah = None
 
     def test_suppression(self):
-        self.assertEquals(self.ap.filter('hello\33[>1tworld\n'), 'hello')
+        self.assertEqual(self.ap.filter('hello\33[>1tworld\n'), 'hello')
 
     def test_suppress_cancel(self):
-        self.assertEquals(self.ap.filter('hello\33[>1tworld\33[>0there\n'), 'hellohere\n')
+        self.assertEqual(self.ap.filter('hello\33[>1tworld\33[>0there\n'), 'hellohere\n')
 
     def test_suppress_eol(self):
-        self.assertEquals(self.ap.filter('hello\33[>1tworld\nvisible\n'), 'hellovisible\n')
-        self.assertEquals(self.ap.filter('hello\33[>1tworld\nvisible'), 'hellovisible')
-        self.assertEquals(self.ap.filter('\33[>1tworld\nvisible'), 'visible')
-        self.assertEquals(self.ap.filter('\33[>1tworld\nvisible\33[>0t'), 'visible')
-        self.assertEquals(self.ap.filter('\33[>1tworld\nvisible\33[K'), 'visible\33[K')
+        self.assertEqual(self.ap.filter('hello\33[>1tworld\nvisible\n'), 'hellovisible\n')
+        self.assertEqual(self.ap.filter('hello\33[>1tworld\nvisible'), 'hellovisible')
+        self.assertEqual(self.ap.filter('\33[>1tworld\nvisible'), 'visible')
+        self.assertEqual(self.ap.filter('\33[>1tworld\nvisible\33[>0t'), 'visible')
+        self.assertEqual(self.ap.filter('\33[>1tworld\nvisible\33[K'), 'visible\33[K')
 
     def test_suppress_image(self):
         self.ap.inline_images_enabled = False
-        self.assertEquals(self.ap.filter('hello\33[>2tworld\nvisible\n'), 'helloworld\nvisible\n')
-        self.assertEquals(self.ap.filter('hello\33[>2tworld\nvisible'), 'helloworld\nvisible')
-        self.assertEquals(self.ap.filter('\33[>2tworld\nvisible'), 'world\nvisible')
-        self.assertEquals(self.ap.filter('\33[>2tworld\nvisible\33[>0t'), 'world\nvisible')
-        self.assertEquals(self.ap.filter('\33[>2tworld\nvisible\33[K'), 'world\nvisible\33[K')
+        self.assertEqual(self.ap.filter('hello\33[>2tworld\nvisible\n'), 'helloworld\nvisible\n')
+        self.assertEqual(self.ap.filter('hello\33[>2tworld\nvisible'), 'helloworld\nvisible')
+        self.assertEqual(self.ap.filter('\33[>2tworld\nvisible'), 'world\nvisible')
+        self.assertEqual(self.ap.filter('\33[>2tworld\nvisible\33[>0t'), 'world\nvisible')
+        self.assertEqual(self.ap.filter('\33[>2tworld\nvisible\33[K'), 'world\nvisible\33[K')
 
         self.ap.inline_images_enabled = True
-        self.assertEquals(self.ap.filter('hello\33[>2tworld\nvisible\n'), 'hellovisible\n')
-        self.assertEquals(self.ap.filter('hello\33[>2tworld\nvisible'), 'hellovisible')
-        self.assertEquals(self.ap.filter('\33[>2tworld\nvisible'), 'visible')
-        self.assertEquals(self.ap.filter('\33[>2tworld\nvisible\33[>0t'), 'visible')
-        self.assertEquals(self.ap.filter('\33[>2tworld\nvisible\33[K'), 'visible\33[K')
+        self.assertEqual(self.ap.filter('hello\33[>2tworld\nvisible\n'), 'hellovisible\n')
+        self.assertEqual(self.ap.filter('hello\33[>2tworld\nvisible'), 'hellovisible')
+        self.assertEqual(self.ap.filter('\33[>2tworld\nvisible'), 'visible')
+        self.assertEqual(self.ap.filter('\33[>2tworld\nvisible\33[>0t'), 'visible')
+        self.assertEqual(self.ap.filter('\33[>2tworld\nvisible\33[K'), 'visible\33[K')
 
     def test_passthrough(self):
-        self.assertEquals(self.ap.filter('hello, world'), 'hello, world')
+        self.assertEqual(self.ap.filter('hello, world'), 'hello, world')
 
     def test_start(self):
-        self.assertEquals(self.ah.filter('a\33[>1;"jon"pb'), 'ab')
-        self.assertEquals(self.ah.stack, [['start','jon']])
+        self.assertEqual(self.ah.filter('a\33[>1;"jon"pb'), 'ab')
+        self.assertEqual(self.ah.stack, [['start','jon']])
 
     def test_start_null_name(self):
-        self.assertEquals(self.ah.filter('aa\33[>1;pbb'), 'aabb')
-        self.assertEquals(self.ah.stack, [['start',None]])
+        self.assertEqual(self.ah.filter('aa\33[>1;pbb'), 'aabb')
+        self.assertEqual(self.ah.stack, [['start',None]])
 
     def test_start_null_name2(self):
-        self.assertEquals(self.ah.filter('aa\33[>1pbb'), 'aabb')
-        self.assertEquals(self.ah.stack, [['start',None]])
+        self.assertEqual(self.ah.filter('aa\33[>1pbb'), 'aabb')
+        self.assertEqual(self.ah.stack, [['start',None]])
 
     def test_start_null_name_no_semi(self):
-        self.assertEquals(self.ah.filter('aa\33[>1"jon"pbb'), 'aabb')
-        self.assertEquals(self.ah.stack, [['start','jon']])
+        self.assertEqual(self.ah.filter('aa\33[>1"jon"pbb'), 'aabb')
+        self.assertEqual(self.ah.stack, [['start','jon']])
 
     def test_invalid_private(self):
-        self.assertEquals(self.ap.filter('a\33[>134abc'), 'abc')    # filtered out
+        self.assertEqual(self.ap.filter('a\33[>134abc'), 'abc')    # filtered out
 
     def test_not_our_sequence(self):
-        self.assertEquals(self.ap.filter('a\33[Aabc'), 'a\33[Aabc') # passed
+        self.assertEqual(self.ap.filter('a\33[Aabc'), 'a\33[Aabc') # passed
 
     def test_embedded_digits_in_string(self):
-        self.assertEquals(self.ah.filter('a\33[>1;"abc123def"q'), 'a')
-        self.assertEquals(self.ah.stack, [['debug', 1, 'abc123def']])
+        self.assertEqual(self.ah.filter('a\33[>1;"abc123def"q'), 'a')
+        self.assertEqual(self.ah.stack, [['debug', 1, 'abc123def']])
 
     def test_juxtapositions(self):
-        self.assertEquals(self.ah.filter('a\33[>"xxx"5;6"qq";"ab"3"de""jk"q'), 'a')
-        self.assertEquals(self.ah.stack, [['debug', 'xxx', 5, 6, 'qq', 'ab', 3, 'de', 'jk']])
+        self.assertEqual(self.ah.filter('a\33[>"xxx"5;6"qq";"ab"3"de""jk"q'), 'a')
+        self.assertEqual(self.ah.stack, [['debug', 'xxx', 5, 6, 'qq', 'ab', 3, 'de', 'jk']])
 
     def test_juxtapositions2(self):
-        self.assertEquals(self.ah.filter('a\33[>"xxx"5;6"qq";"ab"3"de""jk"2q'), 'a')
-        self.assertEquals(self.ah.stack, [['debug', 'xxx', 5, 6, 'qq', 'ab', 3, 'de', 'jk', 2]])
+        self.assertEqual(self.ah.filter('a\33[>"xxx"5;6"qq";"ab"3"de""jk"2q'), 'a')
+        self.assertEqual(self.ah.stack, [['debug', 'xxx', 5, 6, 'qq', 'ab', 3, 'de', 'jk', 2]])
 
     def test_invalid_private(self):
-        self.assertEquals(self.ap.filter('aa\33[>1;2;"34"56abc'), 'aa\33[>1;2;"34";56abc')
+        self.assertEqual(self.ap.filter('aa\33[>1;2;"34"56abc'), 'aa\33[>1;2;"34";56abc')
 
     def test_unterminated(self):
         self.assertRaises(IncompleteSequence, self.ap.filter, 'aa\33[>17')
 
     def test_gauge(self):
-        self.assertEquals(self.ah.filter('q\33[>12;"foo";"{}"wq'), 'qq')
-        self.assertEquals(self.ah.stack, [['gauge create', 12, 'foo', '{}']])
+        self.assertEqual(self.ah.filter('q\33[>12;"foo";"{}"wq'), 'qq')
+        self.assertEqual(self.ah.stack, [['gauge create', 12, 'foo', '{}']])
 
-        self.assertEquals(self.ah.filter('\33[>3;"HP";"{v}/{max} HP"wx\33[>3;27;123u\33[>3x'), 'x')
-        self.assertEquals(self.ah.stack, [['gauge create', 12, 'foo', '{}'],
+        self.assertEqual(self.ah.filter('\33[>3;"HP";"{v}/{max} HP"wx\33[>3;27;123u\33[>3x'), 'x')
+        self.assertEqual(self.ah.stack, [['gauge create', 12, 'foo', '{}'],
                                           ['gauge create', 3, "HP", "{v}/{max} HP"],
                                           ['gauge update', 3, 27, 123],
                                           ['gauge destroy', 3]])
 
     def test_location(self):
-        self.assertEquals(self.ah.filter('1\33[>"aa"~2\33[>"bb"~\33[>~\33[>""~3'), '123')
-        self.assertEquals(self.ah.stack, [
+        self.assertEqual(self.ah.filter('1\33[>"aa"~2\33[>"bb"~\33[>~\33[>""~3'), '123')
+        self.assertEqual(self.ah.stack, [
             ['location', 'aa'],
             ['location', 'bb'],
             ['location', None],
@@ -169,13 +169,13 @@ class AnsiParserTest (unittest.TestCase):
             ])
 
     def test_image(self):
-        self.assertEquals(self.ah.filter('1\33[>"aa"v2\33[>"bb"v\33[>v\33[>""v3'), '123')
-        self.assertEquals(self.ah.stack, [
+        self.assertEqual(self.ah.filter('1\33[>"aa"v2\33[>"bb"v\33[>v\33[>""v3'), '123')
+        self.assertEqual(self.ah.stack, [
             ['image', 'aa'],
             ['image', 'bb'],
             ])
 
     def test_disabled_image(self):
         self.ah.inline_images_enabled = False
-        self.assertEquals(self.ah.filter('1\33[>"aa"v2\33[>"bb"v\33[>v\33[>""v3'), '123')
-        self.assertEquals(self.ah.stack, [])
+        self.assertEqual(self.ah.filter('1\33[>"aa"v2\33[>"bb"v\33[>v\33[>""v3'), '123')
+        self.assertEqual(self.ah.stack, [])
