@@ -40,6 +40,7 @@ class ConfigurationManager (configparser.SafeConfigParser):
         # defaults
         #
         my_image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GUI', 'images')
+        self.image_path = my_image_path
         my_home_dir = os.path.expanduser('~')
         if my_home_dir == '~':
             raise InvalidHomeDirectory("unable to determine home directory")

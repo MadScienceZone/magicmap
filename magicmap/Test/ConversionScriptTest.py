@@ -3,7 +3,7 @@
 # RAGNAROK MAGIC MAPPER SOURCE CODE: Unit Test: Magic Map Conversion
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2018 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.

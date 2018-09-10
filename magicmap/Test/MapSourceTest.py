@@ -1,9 +1,9 @@
-# vi:set ai sm nu ts=4 sw=4 expandtab:
+# vi:set ai sm nu ts=4 sw=4 expandtab fileencoding=utf-8:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: Unit Test: Magic Map Source Files
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2018 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.
@@ -167,7 +167,7 @@ class MapSourceTest (unittest.TestCase):
     def test_compile_boxnum(self):
         self._test_compiler((
                 ('(#27)20 700 boxnum',               [['N', 20, 700, '#27']]),
-                (r'(M\2613) 15 20 boxnum',           [['N', 15, 20, 'M\2613']]),
+                (r'(M\2613) 15 20 boxnum',           [['N', 15, 20, 'M–3']]),
                 (r'(f\(x\)) 11 22 boxnum',           [['N', 11, 22, 'f(x)']]),
         ))
 
@@ -702,6 +702,7 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
         self._test_compiler((
             ('5 2 20 { dup } for 16 __test__', [['_T', 5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15, 17, 17, 19, 19 ]]),
             ('10 1 1 4 { add } for 1 __test__', [['_T', 20]]),
+            ('10 -2 4 { dup } for 8 __test__', [['_T', 10, 10, 8, 8, 6, 6, 4, 4]]),
         ))
 
     def test_bit_ops(self):
@@ -743,14 +744,28 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
         ))
 
     def test_symbolic_string_names(self):
+        deprecated_codes = [ 0o320, 0o252, 0o247, 0o261, 0o272, 0o266, 0o242, 0o267, 0o253,
+                             0o262, 0o341, 0o273, 0o263, 0o361, 0o261 ]
         legal_glyphs = {
-            0o320: '[--]', 0o261: '[-]',  0o242: '[/c]', 0o262: '[+]',  0o263: '[++]',
-            0o252: '[``]', 0o272: "['']", 0o267: '[*]',  0o341: '[AE]', 0o361: '[ae]',
-            0o247: '[S]',  0o266: '[P]',  0o253: '[<<]', 0o273: '[>>]', 0o261: '-',
+            '—': '[--]', '–': '[-]',  '¢': '[/c]', '†': '[+]',  '‡': '[++]',
+            '“': '[``]', '”': "['']", '•': '[*]',  'Æ': '[AE]', 'æ': '[ae]',
+            '§': '[S]',  '¶': '[P]',  '«': '[<<]', '»': '[>>]', '‒': '-',
+
+            '—': '320',  '–': '261',  '¢': '242',  '†': '262',  '‡': '263',
+            '“': '252',  '”': "272",  '•': '267',  'Æ': '341',  'æ': '361',
+            '§': '247',  '¶': '266',  '«': '253',  '»': '273', 
+
+            '—': '[#2014]',  '–': '[#2013]', '¢': '[#0a2]', '†': '[#2020]', '‡': '[#2021]',
+            '“': '[#201c]',  '”': "[#201D]", '•': '[#2022]','Æ': '[#00C6]', 'æ': '[#0e6]',
+            '§': '[#0000A7]','¶': '[#b6]',   '«': '[#ab]',  '»': '[#bb]',   'X': '[#58]',
+            'ö': '[#f6]',    '⺝': '[#2e9d]','㒳':'[#34b3]',
+
             '\\': '\\',   '(':  '(',    ')':  ')',   
         }
         for ch in range(256):
-            if 32 <= ch < 127 or ch in legal_glyphs:
+            if ch in deprecated_codes:
+                continue
+            if 32 <= ch < 127:
                 self._test_compiler((('(x\\%03oy) 1 __test__' % ch, [['_T', 'x'+chr(ch)+'y']]),))
             else:
                 try:
@@ -761,10 +776,7 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
                     self.fail("special character code '\\%03o' failed to raise MapFileFormatError exception" % ch)
 
         for ch in legal_glyphs:
-            if isinstance(ch, int):
-                self._test_compiler((('(x\\'+legal_glyphs[ch]+'y) 1 __test__', [['_T', 'x'+chr(ch)+'y']]),))
-            else:
-                self._test_compiler((('(x\\'+legal_glyphs[ch]+'y) 1 __test__', [['_T', 'x'+ch+'y']]),))
+            self._test_compiler((('(x\\'+legal_glyphs[ch]+'y) 1 __test__', [['_T', 'x'+ch+'y']]),))
 
     def test_int_bases(self):
         self._test_compiler((
@@ -814,6 +826,45 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
                 ['Pcf', [21, 22, 4, 5]],
             ]),
         ))
+
+    def test_graphic_state(self):
+        self._test_compiler((
+            ('.42 sg .1 .2 .3 color', [['C', .42, .42, .42], ['C', .1, .2, .3]]),
+            ('.42 sg gsave .1 .2 .3 color grestore', 
+                [['C', .42, .42, .42], ['C', .1, .2, .3], ['C', .42, .42, .42]]),
+            ('gsave .1 .2 .3 color grestore', 
+                [['C', .1, .2, .3], ['C', 0, 0, 0]]),
+            ('gsave txtf grestore', [['Ft',8]]),
+            ('gsave rmnf grestore', [['Fr',6],['Ft',8]]),
+            ('27 bf gsave 10 bf grestore', [['Fb', 27], ['Fb', 10], ['Fb', 27]]),
+            ('27 bf gsave 10 it grestore', [['Fb', 27], ['Fi', 10], ['Fb', 27]]),
+            ('gsave 66 it gsave txtf grestore', [['Fi', 66], ['Ft', 8], ['Fi', 66]]),
+            ('44 tt gsave rmnf txtf grestore', [['FT', 44], ['Fr', 6], ['Ft', 8], ['FT', 44]]),
+            ('44 sf gsave rmnf txtf grestore', [['Ff', 44], ['Fr', 6], ['Ft', 8], ['Ff', 44]]),
+            ('44 sl gsave rmnf txtf grestore', [['Fo', 44], ['Fr', 6], ['Ft', 8], ['Fo', 44]]),
+            ('44 ss gsave rmnf txtf grestore', [['Fs', 44], ['Fr', 6], ['Ft', 8], ['Fs', 44]]),
+            ('gsave 5 lw grestore', [['L', 5], ['L', 1]]),
+            ('''2 3 scale 
+                (one)(two)5 6 7 8 room 9 passagelength east passage west passage
+                (x) (y) 10 11 12 round-room 9 passagelength east passage west passage
+             ''', [
+                ['Z', 2, 3],
+                ['R', 5, 6, 7, 8, 'one', 'two', [['e', 9], ['w', 20]]],
+                ['R', 10, 11, 'R', 12, 'x', 'y',[['e', 9], ['w', 20]]],
+             ]),
+            ('5 6 scale gsave 7 8 scale grestore', [['Z',5,6],['Z',7,8],['Z',5,6]]),
+            ('gsave 7 8 scale grestore', [['Z',7,8],['Z',1,1]]),
+            ('10 -20 translate', [['X',10,-20]]),
+            ('10 -20 translate gsave -1.5 6.6 translate grestore', [['X',10,-20],['X',-1.5,6.6],['X',10,-20]]),
+            ('gsave -1.5 6.6 translate grestore', [['X',-1.5,6.6],['X',0,0]]),
+        ))
+
+    def test_bad_graphic_state(self):
+        for src in (
+            'grestore',
+            'gsave grestore grestore'
+        ):
+            self.assertRaises(MapFileFormatError, self.ms.compile, src)
 
     def test_arc_paths(self):
         self._test_compiler_float_values((

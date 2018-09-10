@@ -347,6 +347,68 @@ class RequireArgs (object):
             return f(f_self, *args)
         return wrapper
 
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+class Color:
+    def __init__(self, r, g, b):
+        self.red = r
+        self.green = g
+        self.blue = b
+
+    def __eq__(self, other):
+        return self.red == other.red and self.green == other.green and self.blue == other.blue
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+class GreyLevel (Color):
+    def __init__(self, v):
+        self.red = self.green = self.blue = v
+
+class FontSelection:
+    def __init__(self, name, size):
+        self.name = name
+        self.size = size
+
+    def __eq__(self, other):
+        return self.name == other.name and self.size == other.size
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+class GraphicsState:
+    def __init__(self, clone_from=None):
+        if clone_from is None:
+            self.color = GreyLevel(0)
+            self.translate = Point(0,0)
+            self.scale = Point(1,1)
+            self.font = FontSelection('Ft', 8)
+            self.line_width = 1
+        else:
+            self.clone(clone_from)
+
+    def clone(self, other_state):
+        self.color = other_state.color
+        self.translate = other_state.translate
+        self.scale = other_state.scale
+        self.font = other_state.font
+        self.line_width = other_state.line_width
+
+    def __eq__(self, other):
+        return self.color == other.color and self.translate == other.translate and self.scale == other.scale and self.font == other.font and self.line_width == other.line_width
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 class MapSource (object):
     '''The Ragnarok Magic Map as described in RRFC42 and RRFC46.
     This object class understands the map file format and can
@@ -356,6 +418,7 @@ class MapSource (object):
     _FIELD_CONT = re.compile(r'^\s+(?P<moretext>\S.*?)\s*$')
     _FIELD_DECL = re.compile(r'^(?P<tag>\w+)\s*:\s*(?P<value>.*?)\s*$')
     _INT_BASE   = re.compile(r'^\s*(?P<base>\d+)#(?P<value>[0-9A-Za-z]+)\s*$')
+    _UNICODE_ESC= re.compile(r'\[#(?P<codepoint>[a-fA-F0-9]{1,6})\]')
     
     _LOOP_MAX = 10000   # too many iterations (emergency stop)
 
@@ -659,6 +722,9 @@ class MapSource (object):
         #  stroke|fill -> [P + coords] for each line
         #  
         # 
+
+        self.graphics_state = [GraphicsState()]
+
         ps_command_dispatch = {
             'arrow':    self._ps_arrow,
             'bf':       self._ps_bf,
@@ -934,6 +1000,37 @@ class MapSource (object):
                     self.stack.append(self._local_symbols[ps_token])
                 else:
                     self._tokenizer_push(self._local_symbols[ps_token])
+            elif ps_token == 'gsave':
+                self.graphics_state.append(GraphicsState(clone_from=self.graphics_state[-1]))
+
+            elif ps_token == 'grestore':
+                if len(self.graphics_state) <= 1:
+                    raise MapFileFormatError('grestore without matching gsave')
+                previous = self.graphics_state.pop()
+                current = self.graphics_state[-1]
+                if (current.color != previous.color):
+                    object.append(['C', current.color.red, current.color.green, current.color.blue])
+                if (current.font != previous.font):
+                    object.append([current.font.name, current.font.size])
+                if (current.line_width != previous.line_width):
+                    object.append(['L', current.line_width])
+                if (current.scale != previous.scale):
+                    object.append(['Z', current.scale.x, current.scale.y])
+                if (current.translate != previous.translate):
+                    object.append(['X', current.translate.x, current.translate.y])
+
+            elif ps_token == 'scale':
+                Sy = self.stack.pop()
+                Sx = self.stack.pop()
+                self.graphics_state[-1].scale = Point(Sx, Sy)
+                object.append(['Z', Sx, Sy])
+
+            elif ps_token == 'translate':
+                Dy = self.stack.pop()
+                Dx = self.stack.pop()
+                self.graphics_state[-1].translate = Point(Dx, Dy)
+                object.append(['X', Dx, Dy])
+
             else:
                 raise MapFileFormatError('Unrecognized map drawing command "'+ ps_token + '".')
 
@@ -951,15 +1048,24 @@ class MapSource (object):
     #
     # trivial stuff
     #
-    def _ps_txtf(self):  return ['Ft', 8]
-    def _ps_rmnf(self):  return ['Fr', 6]
-    def _ps_bk(self):    return ['C', 0, 0, 0]
-    def _ps_gr(self):    return ['C', .5, .5, .5]
-    def _ps_wh(self):    return ['C', 1, 1, 1]
+    def _ps_txtf(self):  return self._setfont('Ft', 8)
+    def _ps_rmnf(self):  return self._setfont('Fr', 6)
     def _do_true(self):  self.stack.append(-1)
     def _do_false(self): self.stack.append(0)
     def _do_count(self): self.stack.append(len(self.stack))
     def _do_clear(self): self.stack = []
+
+    def _ps_bk(self):    
+        self.graphics_state[-1].color = GreyLevel(0)
+        return ['C', 0, 0, 0]
+
+    def _ps_gr(self):    
+        self.graphics_state[-1].color = GreyLevel(0.5)
+        return ['C', .5, .5, .5]
+
+    def _ps_wh(self):    
+        self.graphics_state[-1].color = GreyLevel(1)
+        return ['C', 1, 1, 1]
 
     def _do_currentpoint(self): 
         if self.current_point is None:
@@ -1355,32 +1461,43 @@ class MapSource (object):
 
         self.current_point = current if current is not None else pointlist[-1]
 
+    def _setfont(self, name, size=None):
+        if size is None:
+            size = self.stack.pop()
+        self.graphics_state[-1].font = FontSelection(name, size)
+        return [name, size]
+
     @RequireArgs('ss', 'd')
-    def _ps_ss(self):   return ['Fs', self.stack.pop()]
+    def _ps_ss(self):   return self._setfont('Fs')
 
     @RequireArgs('tt', 'd')
-    def _ps_tt(self):   return ['FT', self.stack.pop()]
+    def _ps_tt(self):   return self._setfont('FT')
 
     @RequireArgs('bf', 'd')
-    def _ps_bf(self):   return ['Fb', self.stack.pop()]
+    def _ps_bf(self):   return self._setfont('Fb')
 
     @RequireArgs('it', 'd')
-    def _ps_it(self):   return ['Fi', self.stack.pop()]
+    def _ps_it(self):   return self._setfont('Fi')
 
     @RequireArgs('sl', 'd')
-    def _ps_sl(self):   return ['Fo', self.stack.pop()]
+    def _ps_sl(self):   return self._setfont('Fo')
 
     @RequireArgs('sf', 'd')
-    def _ps_sf(self):   return ['Ff', self.stack.pop()]
+    def _ps_sf(self):   return self._setfont('Ff')
 
     @RequireArgs('sg', 'k')
     def _ps_sg(self):
         v = self.stack.pop()
+        self.graphics_state[-1].color = GreyLevel(v)
         return ['C', v, v, v]
 
     @RequireArgs('color', 'kkk')
     def _ps_color(self):
-        return ['C'] + list(reversed([self.stack.pop() for i in range(3)]))
+        blue = self.stack.pop()
+        green = self.stack.pop()
+        red = self.stack.pop()
+        self.graphics_state[-1].color = Color(red, green, blue)
+        return ['C', red, green, blue]
 
     @RequireArgs('box', 'ccdd')
     def _ps_box(self):
@@ -1417,7 +1534,9 @@ class MapSource (object):
 
     @RequireArgs('lw', 'd')
     def _ps_linewidth(self):
-        return ['L', self.stack.pop()]
+        size = self.stack.pop()
+        self.graphics_state[-1].line_width = size
+        return ['L', size]
 
     @RequireArgs('mazearea', 'p')
     @RoomAttributes
@@ -1542,7 +1661,8 @@ class MapSource (object):
             # range loop: list is [min, step, max]
             # we add current counter to that control and insert into queue
             control = count[0:3] + [count[0]]  # initialized for first pass
-            if control[0] <= control[2]:
+            if (control[1] < 0 and control[0] >= control[2]) or (
+                control[1] > 0 and control[0] <= control[2]):
                 self._token_input_stack.append([0, control, 0, block])
                 self.stack.append(control[3])  # start of 1st iter: push current value
         elif count > 0:
@@ -1599,9 +1719,14 @@ class MapSource (object):
 
                     if isinstance(remaining, list):             # ranged loop: check parameters
                         remaining[3] += remaining[1]            #   increment loop counter
-                        if remaining[3] > remaining[2]:         #   exceeded max value? stop
-                            self._tokenizer_pop()
-                            continue
+                        if remaining[1] < 0:                    # if we're counting DOWN, we need to check
+                            if remaining[3] < remaining[2]:     #   if we're below the max value.
+                                self._tokenizer_pop()
+                                continue
+                        else:                                   # otherwise, we check to see if we
+                            if remaining[3] > remaining[2]:     #   exceeded max value? stop
+                                self._tokenizer_pop()
+                                continue
 
                         self.stack.append(remaining[3])         #   push current value
                         pc = self._token_input_stack[-1][0] = 0     #   rewind PC to start of block again
@@ -1738,32 +1863,53 @@ def string_escape_translator(code):
     r"given a special character code (e.g., the 'n' or '123' part of '\n' or '\123'), return the character it represents."
 
     special_codes = {
-                        '[/c]': 0o242,   # cents
-                        '[S]':  0o247,   # section
-                        '[``]': 0o252,   # open " quotes
-                        '[<<]': 0o253,   # open << quotes
-                        '[-]':  0o261,   # en-dash
-                        '-':    0o261,   # minus
-                        '[+]':  0o262,   # dagger
-                        '[++]': 0o263,   # double dagger
+                        '[/c]': 0x00a2,   # cents
+                        '[S]':  0x00a7,   # section
+                        '[``]': 0x201c,   # open " quotes
+                        '[<<]': 0x00ab,   # open << quotes
+                        '[-]':  0x2013,   # en-dash
+                        '-':    0x2012,   # minus
+                        '[+]':  0x2020,   # dagger
+                        '[++]': 0x2021,   # double dagger
                         '[P]':  0o266,   # paragraph (pilcrow)
-                        '[*]':  0o267,   # bullet
-                        "['']": 0o272,   # close " quotes
-                        '[>>]': 0o273,   # close >> quotes
-                        '[--]': 0o320,   # em-dash
-                        '[AE]': 0o341,   # AE ligature
-                        '[ae]': 0o361,   # ae ligature
+                        '[*]':  0x2022,   # bullet
+                        "['']": 0x201d,   # close " quotes
+                        '[>>]': 0x00bb,   # close >> quotes
+                        '[--]': 0x2014,   # em-dash
+                        '[AE]': 0x00c6,   # AE ligature
+                        '[ae]': 0x00e6,   # ae ligature
+                                          #
+                                          # Deprecated legacy codes
+                                          #
+                        '242': 0x00a2,    # cents
+                        '247': 0x00a7,    # section
+                        '252': 0x201c,    # open " quotes
+                        '253': 0x00ab,    # open << quotes
+                        '261': 0x2013,    # en-dash
+                        '262': 0x2020,    # dagger
+                        '263': 0x2021,    # double dagger
+                        '266': 0o266,     # paragraph (pilcrow)
+                        '267': 0x2022,    # bullet
+                        "272": 0x201d,    # close " quotes
+                        '273': 0x00bb,    # close >> quotes
+                        '320': 0x2014,    # em-dash
+                        '341': 0x00c6,    # AE ligature
+                        '361': 0x00e6,    # ae ligature
     }
 
     if code in special_codes:
         return chr(special_codes[code])
+
+    u = MapSource._UNICODE_ESC.fullmatch(code)
+    if u:
+        return chr(int(u.group('codepoint'),16))
 
     try:
         ch = int(code, 8)
     except:
         raise MapFileFormatError(r'Invalid string escape code "\{0}".'.format(code))
 
-    if 32 <= ch < 127 or ch in list(special_codes.values()):
+    if 32 <= ch < 127:
         return chr(ch)
 
     raise MapFileFormatError(r'Invalid string escape code "\{0}" (out of allowed range of character codes).'.format(code))

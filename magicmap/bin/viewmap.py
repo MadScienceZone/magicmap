@@ -1,8 +1,7 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python3
 # vi:set ai sm nu ts=4 sw=4 expandtab:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: mapping client
-# $Header$
 #
 # Copyright (c) 2010, 2018 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
@@ -30,9 +29,10 @@
 
 import sys
 import os, os.path
-import tkinter
 import optparse
 import platform
+import tkinter as tk
+from tkinter import ttk
 
 #@@REL@@sys.tracebacklimit=0
 
@@ -43,10 +43,10 @@ sys.path.append(os.path.join('..','lib'))
 from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
 config = ConfigurationManager()
 
-from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
-from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
+#from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
+#from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
 
-op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.0')
+op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.1')
 if platform.system() == 'Windows':
     op.set_defaults(expand_globs=True, pattern='*.map')
 else:
@@ -62,7 +62,7 @@ op.add_option('-v', '--verbose',      action='count',      help='Increase verbos
 opt, cmd_map_file_list = op.parse_args()
 
 print("""
-             Ragnarok Magic Map 6.0b1 Preview Tool (viewmap)
+             Ragnarok Magic Map 6.1 Preview Tool (viewmap)
                   *** PRE-RELEASE PREVIEW VERSION ***
 
 Thank you for helping us test this program prior to releasing it as ready
@@ -74,49 +74,59 @@ Error messages about your map pages will show up here as well.  Eventually
 they will be put in a GUI window for you.
 """)
 
-class MapPreviewApp(wx.App):
-    def OnInit(self):
-        display_splash_screen('viewmaplogo.png')
-        frame = MapPreviewFrame(title="Magic Map Preview", config=config, prog_name="viewmap",
-            expand_globs = opt.expand_globs,
-            recursive = opt.recursive,
-            pattern = opt.pattern,
-            ignore_errors = opt.ignore_errors,
-            verbose = opt.verbose,
-            file_list = cmd_map_file_list,
-            image_dir = opt.image_dir,
-            about_text = '''
-This application allows wizards to preview what their maps will look like by loading the raw "source" form of the map pages into this viewer.
+class MapPreviewApp (tk.Tk):
+    def __init__(self, *args, **kwargs):
+        tk.Tk.__init__(self, *args, **kwargs)
+        self.iconbitmap(bitmap=os.path.join(config.image_path,'mapper.ico'))
+#XXX WINDOWS                        default=os.path.join(config.image_path,'mapper.ico'))
+        self.wm_title('Ragnarok MagicMap Preview')
 
-Run with the --help option for more details, or see the documentation online.  (Link below)''',
-            help_text = '''The official documentation for this program can be found
-online at the following URL:
+        frame = tk.Frame(self)
+        frame.pack()
 
-http://www.rag.com/tech/tools/viewmap
-
-A brief synopsis of viewmap's usage may be displayed by
-running it with the --help option.''')
-        frame.Show()
-        self.SetTopWindow(frame)
-        return True
-
-#    def OnExit(self):
-
-Application = MapPreviewApp(redirect=False)
-Application.MainLoop()
-#@@BEGIN-DEV:
+#    def OnInit(self):
+#        display_splash_screen('viewmaplogo.png')
+#        frame = MapPreviewFrame(title="Magic Map Preview", config=config, prog_name="viewmap",
+#            expand_globs = opt.expand_globs,
+#            recursive = opt.recursive,
+#            pattern = opt.pattern,
+#            ignore_errors = opt.ignore_errors,
+#            verbose = opt.verbose,
+#            file_list = cmd_map_file_list,
+#            image_dir = opt.image_dir,
+#            about_text = '''
+#This application allows wizards to preview what their maps will look like by loading the raw "source" form of the map pages into this viewer.
 #
-# Style notes:
-#  1. import wx (not * or wxPython.wx stuff)
-#  2. constructors should use kw args
-#  3. Don't use IDs; wx.ID_ANY if needed
-#     But use standard IDs like wx.ID_EXIT
-#  4. Use Bind() for events
-#  5. sizers, not absolute positions
-#  6. wx.App, not wx.PySimpleApp
-#  7. separate classes, not nested panels in one
-#  8. native preferred over wx: size=(500,400) not size=wx.Size(500,400)
-#  9. docstrings
-# 10. StdDialogButtonSizer adapts to platform look and feel
-# 
-#:END-DEV@@
+#Run with the --help option for more details, or see the documentation online.  (Link below)''',
+#            help_text = '''The official documentation for this program can be found
+#online at the following URL:
+#
+#http://www.rag.com/tech/tools/viewmap
+#
+#A brief synopsis of viewmap's usage may be displayed by
+#running it with the --help option.''')
+#        frame.Show()
+#        self.SetTopWindow(frame)
+#        return True
+#
+##    def OnExit(self):
+#
+
+Application = MapPreviewApp()
+Application.mainloop()
+##@@BEGIN-DEV:
+##
+## Style notes:
+##  1. import wx (not * or wxPython.wx stuff)
+##  2. constructors should use kw args
+##  3. Don't use IDs; wx.ID_ANY if needed
+##     But use standard IDs like wx.ID_EXIT
+##  4. Use Bind() for events
+##  5. sizers, not absolute positions
+##  6. wx.App, not wx.PySimpleApp
+##  7. separate classes, not nested panels in one
+##  8. native preferred over wx: size=(500,400) not size=wx.Size(500,400)
+##  9. docstrings
+## 10. StdDialogButtonSizer adapts to platform look and feel
+## 
+##:END-DEV@@
