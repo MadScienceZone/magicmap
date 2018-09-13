@@ -1,9 +1,9 @@
-# vi:set ai sm nu ts=4 sw=4 expandtab:
+# vi:set ai sm nu ts=4 sw=4 expandtab fileencoding=utf-8:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: GUI: Map Canvas
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2018 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.
@@ -28,12 +28,18 @@
 #
 import sys
 import os.path
+import re
+import traceback
 
-import wx
+import tkinter as tk
+from tkinter import font
+from tkinter import ttk
 import math
 import itertools
 import RagnarokMUD.MagicMapper.MapPage
-from   RagnarokMUD.MagicMapper.Bezier   import make_bezier
+from   RagnarokMUD.MagicMapper.GUI.ScrolledCanvas import ScrolledCanvas
+from   RagnarokMUD.MagicMapper.BasicUnits         import Point, Color, GreyLevel, FontSelection, DashPattern
+from   RagnarokMUD.MagicMapper.Bezier             import make_bezier
 
 class MapDataFormatError (Exception):
     "Problem with internal data representation of the map locations."
@@ -47,21 +53,24 @@ class InvalidRoomFlag (InvalidDrawingElement):
 class MapDataProcessingError (Exception):
     "Problem encountered trying to handle a location."
 
-class MapCanvas (wx.ScrolledWindow):
-    FontCodeTranslation = {
-            'b':    (wx.FONTFAMILY_SWISS,    wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD),
-            'i':    (wx.FONTFAMILY_ROMAN,    wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL),
-            'o':    (wx.FONTFAMILY_SWISS,    wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL),
-            'r':    (wx.FONTFAMILY_ROMAN,    wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL),
-            's':    (wx.FONTFAMILY_SWISS,    wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL),
-            't':    (wx.FONTFAMILY_SWISS,    wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD),
-            'T':    (wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL),
-    }
+class FontDetail:
+    def __init__(self, family, size, weight, slant):
+        self.family = family
+        self.size = size
+        self.weight = weight
+        self.slant = slant
+        self.object = None
 
-    def __init__(self, parent, size=wx.DefaultSize, page_obj=None, config=None, image_dir=None, *a, **k):
-        #wx.Panel.__init__(self, parent, size, style=wx.SUNKEN_BORDER, *a, **k)
-        wx.ScrolledWindow.__init__(self, parent, -1, (0,0), size=size, style=wx.SUNKEN_BORDER, *a, **k)
+        if self.size:
+            self.object = font.Font(family=family, size=size, weight=weight, slant=slant)
 
+class MapCanvas (ScrolledCanvas):
+    def __init__(self, master, scrollregion=(0, 0, 1000, 1000), page_obj=None, config=None, image_dir=None, *args, **kwargs):
+        ScrolledCanvas.__init__(self, master, scrollregion=scrollregion, *args, **kwargs)
+
+        self.graph_paper_mode = False
+        self._shade_pattern = re.compile(r'\$(\d\d)')
+        self._color_pattern = re.compile(r'\#([0-9a-fA-F]{6})')
         self.config = config
         self.image_dir = image_dir
         self.canvas_left_margin = self.config.getfloat('rendering', 'canvas_left_margin')
@@ -69,558 +78,636 @@ class MapCanvas (wx.ScrolledWindow):
         self.font_magnification = self.config.getfloat('rendering', 'font_magnification')
         self.page_number_font = self.config.get('rendering', 'page_number_font')
         self.page_number_size = self.config.getint('rendering', 'page_number_size')
-        self.page_number_x = self.config.getint('rendering', 'page_number_x')
-        self.page_number_y = self.config.getint('rendering', 'page_number_y')
+        self.page_number_location = Point(self.config.getint('rendering', 'page_number_x'),
+                                          self.config.getint('rendering', 'page_number_y'))
         self.page_title_font = self.config.get('rendering', 'page_title_font')
         self.page_title_size = self.config.getint('rendering', 'page_title_size')
-        self.page_title_x = self.config.getint('rendering', 'page_title_x')
-        self.page_title_y = self.config.getint('rendering', 'page_title_y')
-        self.page_title2_x = self.config.getint('rendering', 'page_title2_x')
-        self.page_title2_y = self.config.getint('rendering', 'page_title2_y')
+        self.page_title_location = Point(self.config.getint('rendering', 'page_title_x'),
+                                         self.config.getint('rendering', 'page_title_y'))
+        self.page_title2_location = Point(self.config.getint('rendering', 'page_title2_x'),
+                                          self.config.getint('rendering', 'page_title2_y'))
+        self.font_code_translation = {}
+        for code, key in (
+            ('b', 'bold'),
+            ('i', 'italic'),     
+            ('f', 'serif'),    
+            ('o', 'slanted'),  
+            ('r', 'roman'),
+            ('s', 'sans'),
+            ('t', 'text'),
+            ('T', 'typewriter'),
+        ):
+            for field in 'family', 'weight', 'slant':
+                if not self.config.has_option('fonts', key+"_"+field):
+                    raise MapDataFormatError('Missing preferences setting for {}_{} in [fonts] section'.format(key, field))
+
+            if self.config.has_option('fonts', key+"_size"):
+                size = self.config.getint('fonts', key+"_size");
+            else:
+                size = None
+            self.font_code_translation[code] = FontDetail(self.config.get('fonts', key+"_family"), 
+                  size, self.config.get('fonts', key+"_weight"), self.config.get('fonts', key+"_slant"))
+
         N = self.config.getint('rendering', 'bezier_points')
         self.Bezier_range = [i/(N-1.0) for i in range(N)]
+        self.spline_points = self.config.getint('rendering', 'spline_points')
         self.image_cache = {}
-        self.bg_tile = wx.Bitmap(self.config.get('rendering', 'background_tile'))
-        self.logo_image = wx.Bitmap(self.config.get('rendering', 'logo_image'))
-        self.bg_w, self.bg_h = self.bg_tile.GetWidth(), self.bg_tile.GetHeight()
+        self.font_cache = {}
+        self.logo_image = self._image_tk_id(file=self.config.get('rendering', 'logo_image'))
+        self.bg_image = self._image_tk_id(file=self.config.get('rendering', 'background_tile'))
+        self.bg_w = self.bg_image.width()
+        self.bg_h = self.bg_image.height()
+        self.canvas_w = scrollregion[2]
+        self.canvas_h = scrollregion[3]
+        self._reset_defaults()
+
         self.page_obj = page_obj
         self.current_location = None
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
-        self.DrawingElementDispatchTable = {
-            #cmd: drawing method,         args, include flags?
-            'A': (self.DrawMapAreaFill,      7, False),
-            'B': (self.DrawMapBox,           4, False),
-            'C': (self.SetMapColour,         3, False),
-            'D': (self.SetMapDashPattern,    2, False),
-            'F': (self.SetMapFont,           1, True),
-            'G': (self.DrawMapBitmap,        5, False),
-            'L': (self.SetMapLineWidth,      1, False),
-            'M': (self.DrawMapMazeCorridors, 1, True),
-            'N': (self.DrawMapNumberBox,     3, False),
-            'O': (self.DrawMapDotMark,       3, True),
-            'P': (self.DrawMapPolygon,       1, True),
-            'Q': (self.DrawMapArc,           1, True),
-            'R': (self.DrawMapRoom,          7, True),
-            'S': (self.DrawMapText,          3, False),
-            'T': (self.DrawMapTree,          2, True),
-            'V': (self.DrawMapVector,        4, False),
+        self.drawing_element_dispatch_table = {
+            #cmd: drawing method,            args, include flags?
+            'A': (self.draw_map_area_fill,      7, False),
+            'B': (self.draw_map_box,            4, False),
+            'C': (self._set_map_color,          3, False),
+            'D': (self._set_map_dash_pattern,   2, False),
+            'F': (self._set_map_font,           1, True),
+            'G': (self.draw_map_bitmap,         5, False),
+            'L': (self._set_line_width,         1, False),
+            'M': (self.draw_map_maze_corridors, 1, True),
+            'N': (self.draw_map_number_box,     3, False),
+            'O': (self.draw_map_dot_mark,       3, True),
+            'P': (self.draw_map_polygon,        1, True),
+            'Q': (self.draw_map_arc,            1, True),
+            'R': (self.draw_map_room,           7, True),
+            'S': (self._draw_map_text,          3, False),
+            'T': (self.draw_map_tree,           2, True),
+            'V': (self._draw_map_vector,        4, False),
+            'X': (self._set_translation,        2, False),
+            'Z': (self._set_scale_factor,       2, False),
         }
+        self.refresh()
 
-        self.SetVirtualSize((1000,1000))
-        self.SetScrollRate(20,20)
-
-        self.buffer = wx.EmptyBitmap(1000,1000)
-        dc = wx.BufferedDC(None, self.buffer)
-        self.RenderMapToDC(dc)
-
-    def OnPaint(self, event):
-        dc = wx.BufferedPaintDC(self, self.buffer, wx.BUFFER_VIRTUAL_AREA)
-
-    def UpdateMapImage(self):
-        self.RenderMapToDC(wx.BufferedDC(None, self.buffer))
-        self.Refresh()
+    def _reset_defaults(self):
+        self.landscape = False
+        self.set_map_color(GreyLevel(0))
+        self.set_map_font(FontSelection('t',8))
+        self.set_translation(Point(0,0))
+        self.set_scale_factor(Point(1,1))
+        self.set_line_width(1)
+        self.set_map_dash_pattern(DashPattern([],0))
 
     def display_page(self, new_page_obj):
         "Switch to displaying a new page object."
         if new_page_obj != self.page_obj:
             self.page_obj = new_page_obj
-            self.UpdateMapImage()
+            self.refresh()
 
-    def _pos_map2wx(self, x, y):
-        "Convert map (x,y) position (lower-left origin) to wx (upper-lefe) as (x,y) tuple"
-        return (x+self.canvas_left_margin, (610 if self.MMap_LandscapePage else 730) - y + self.canvas_top_margin)
+    def _pos_map2tk(self, point, absolute=False):
+        "Convert magic map point to canvas coordinates"
 
-    def _colour_map2wx(self, r, g, b):
-        "Convert map colour values (0.0-1.0) to wx values (0-255) as RGB tuple"
-        return (r * 255, g * 255, b * 255)
+        new_point =  Point(
+            point.x * self.current_scale.x + self.current_translation.x + self.canvas_left_margin,
+            (610 if self.landscape else 730) - 
+                (point.y * self.current_scale.y + self.current_translation.y) 
+                + self.canvas_top_margin
+        )
+        #print(":: _pos_map2tk(({},{}) absolute={} -> ({}*{}+{}+{}={}, {}-({}*{}+{})+{}={})".format(
+        #    point.x, point.y, absolute, 
+        #    point.x, self.current_scale.x, self.current_translation.x, self.canvas_left_margin,
+        #    new_point.x,
+        #    (610 if self.landscape else 730),
+        #        point.y, self.current_scale.y, self.current_translation.y, self.canvas_top_margin,
+        #    new_point.y)
+        #)
+        return new_point
 
-    def DrawGraphPaper(self, dc):
+    def draw_graph_paper(self):
         for width, skip in ((1,5), (2,30)):
-            dc.SetPen(wx.Pen((30,144,255), width))
-            for x in range(30, (700 if self.MMap_LandscapePage else 580)+1, skip):
-                dc.DrawLine(x+self.canvas_left_margin, 30+self.canvas_top_margin, 
-                        x+self.canvas_left_margin, (580 if self.MMap_LandscapePage else 700)+self.canvas_top_margin)
-            for y in range((580 if self.MMap_LandscapePage else 700), 30-1, -skip):
-                dc.DrawLine(30+self.canvas_left_margin, y+self.canvas_top_margin, 
-                        (700 if self.MMap_LandscapePage else 580)+self.canvas_left_margin, y+self.canvas_top_margin)
+            for x in range(30, (700 if self.landscape else 580)+1, skip):
+                self.canvas.create_line(x+self.canvas_left_margin, 30+self.canvas_top_margin,
+                    x+self.canvas_left_margin, (580 if self.landscape else 700)+self.canvas_top_margin,
+                    fill='#1e90ff', width=width)
+            for y in range((580 if self.landscape else 700), 30-1, -skip):
+                self.canvas.create_line(30+self.canvas_left_margin, y+self.canvas_top_margin,
+                    (700 if self.landscape else 580)+self.canvas_left_margin, y+self.canvas_top_margin,
+                    fill='#1e90ff', width=width)
 
-        self.SetMapFont(dc, 't',8)
-        for x in range(30, (700 if self.MMap_LandscapePage else 580)+1, 30):
-            self.DrawMapText(dc, x, (580 if self.MMap_LandscapePage else 700)+8, str(x), center_on_xy=True)
-        for y in range(30, (580 if self.MMap_LandscapePage else 700)+1, 30):
-            self.DrawMapText(dc, 22, y, str(y), center_on_xy=True)
+        self.set_map_font(FontSelection('t',8))
+        for x in range(30, (700 if self.landscape else 580)+1, 30):
+            self.draw_map_text(Point(x, (580 if self.landscape else 700)+8), str(x), center_on_xy=True)
+        for y in range(30, (580 if self.landscape else 700)+1, 30):
+            self.draw_map_text(Point(22, y), str(y), center_on_xy=True)
 
-    def SetCurrentLocation(self, room_id=None):
-        "Make the specified room the current location (default or None = no current location)"
-        # XXX flip to page?  or is that a higher-level management layer?
-        if self.current_location != room_id:
-            self.current_location = room_id
-            self.UpdateMapImage()
-
-    def DrawMapAreaFill(self, dc, x, y, w, h, r, g, b):
+    def draw_map_area_fill(self, x, y, w, h, r, g, b):
         "[A,x,y,w,h,r,g,b] -> rectangular area at (x,y) by (w,h) filled in specified color"
-        x, y = self._pos_map2wx(x, y)
-        colour = self._colour_map2wx(r, g, b)
-        dc.SetPen(wx.Pen(colour))
-        dc.SetBrush(wx.Brush(colour))
-        dc.DrawPolygon([(x,y), (x+w,y), (x+w,y-h), (x,y-h)])
+        point1 = self._pos_map2tk(Point(x, y))
+        point2 = self._pos_map2tk(Point(x+w, y+h))
+        self.canvas.create_rectangle(point1.x, point1.y, point2.x, point2.y, 
+            tags=[], fill=Color(r, g, b).rgb, width=0)
+        self.set_map_color(GreyLevel(0))
 
-    def DrawMapBox(self, dc, x, y, w, h):
+    def draw_map_box(self, x, y, w, h):
         "[B, x, y, w, h] -> unfilled rectangle at (x,y) by (w,h) in current color, current line width"
-        x, y = self._pos_map2wx(x, y)
-        dc.SetPen(self.MMap_CurrentPen)
-        dc.DrawLines([(x,y), (x+w,y), (x+w,y-h), (x,y-h), (x,y)])
-
-    def DrawMapBitmap(self, dc, x, y, w, h, image_id):
+        point1 = self._pos_map2tk(Point(x, y))
+        point2 = self._pos_map2tk(Point(x+w, y+h))
+        if self.current_dash_pattern is not None:
+            self.canvas.create_rectangle(point1.x, point1.y, point2.x, point2.y, 
+                tags=[], outline=self.current_color.rgb, width=self.current_line_width,
+                dash=self.current_dash_pattern.pattern, dashoffset=self.current_dash_pattern.offset)
+        else:
+            self.canvas.create_rectangle(point1.x, point1.y, point2.x, point2.y, 
+                tags=[], outline=self.current_color.rgb, width=self.current_line_width)
+            
+    def draw_map_bitmap(self, x, y, w, h, image_id):
         "[G, x, y, w, h, id] -> draw image at (x,y) scaled to (w,h)"
+        point1=self._pos_map2tk(Point(x,y))
+        self.canvas.create_image(point1.x, point1.y, anchor=tk.SW, image=self._image_tk_id(image_id))
 
-        if (image_id,w,h) not in self.image_cache:
-            image_filename = os.path.join(os.path.expanduser(self.image_dir or self.config.get('preview', 'image_dir')), image_id[0], image_id)
-            if w == 0 and h == 0:
-                the_image = wx.BitmapFromImage(wx.Image(image_filename, wx.BITMAP_TYPE_PNG))
-            else:
-                the_image = wx.BitmapFromImage(wx.Image(image_filename, wx.BITMAP_TYPE_PNG).Rescale(w, h))
-            self.image_cache[(image_id,w,h)] = the_image
-        else:
-            the_image = self.image_cache[(image_id,w,h)]
+    def _color_from_flags(self, flags):
+        '''Set internal colors based on flags. The following are recognized. Additional flags
+        may be present and are ignored:
 
-        x, y = self._pos_map2wx(x, y+the_image.GetHeight())
-        dc.DrawBitmap(the_image, x, y, True)
+        d       standard coloring for dark rooms
+        o       standard coloring for outdoor rooms
+        p       standard coloring for prototype rooms
+        $nn     fill with grayscale level nn (00-99) as a percentage (00=black, 99=almost white)
+        #rrggbb fill with RGB color where rr,gg,bb are 00-ff hex values
+        @       change standard colors for current player location
 
-    def _standard_colour(self, flags):
-        '''Given set of flags, return appropriate pen and brush:
-              FLAG  EFFECT
-                @    use color set for current location
-                o    use outdoor pen
-                d    use dark brush
-                $nn  use shade value nn (00-99)
+        returns tuple (line color, line width, fill color, dash pattern).
+        Individual elements of that tuple are taken from room standard colors if not overridden
+        by these flags.
         '''
-        shade_i = flags.find('$')
-        shade_v = None
-        if shade_i >= 0:
-            try:
-                shade_v = int(flags[shade_i+1:shade_i+3])
-            except ValueError:
-                raise InvalidRoomFlag('Unrecognized use of $xx room flag ({0})'.format(flags[shade_i:shade_i+3]))
 
+        #
+        # default indoor lit room: black thin lines, white fill
+        #
+        dash_pattern = None
+        line_width = 2 if 'o' in flags else 1
         if '@' in flags:
-            if shade_v is not None:
-                brush_colour = (shade_v, shade_v, 0)
-            elif 'd' in flags:
-                brush_colour = self.MMap_HereDarkColour
-            else:
-                brush_colour = self.MMap_HereLightColour
-
-            pen_colour = self.MMap_HereOutdoorColour if 'o' in flags else self.MMap_HereIndoorColour
+            line_color = Color(.5,.5,0) if 'o' in flags else Color(1,0,0)
+            fill_color = Color(.7,.7,0) if 'd' in flags else Color(1,1,0)
         else:
-            if shade_v is not None:
-                brush_colour = (shade_v, shade_v, shade_v)
-            elif 'd' in flags:
-                brush_colour = self.MMap_DarkColour 
-            else:
-                brush_colour = self.MMap_LightColour
+            line_color = GreyLevel(.5) if 'o' in flags else GreyLevel(0)
+            fill_color = GreyLevel(.7) if 'd' in flags else GreyLevel(1)      
 
-            pen_colour = self.MMap_OutdoorColour if 'o' in flags else self.MMap_IndoorColour
+        shade = self._shade_pattern.search(flags)
+        color = self._color_pattern.search(flags)
 
-        pen_width = self.MMap_OutdoorWidth if 'o' in flags else self.MMap_IndoorWidth
+        if shade:
+            fill_color = GreyLevel(int(shade.group(1)) / 100.0)
+            print("shade ({}) -> fill {}".format(shade.group(0), fill_color.rgb))
+        if color:
+            fill_color = Color(int(color.group(1)[0:2], 16) / 255.0,
+                               int(color.group(1)[2:4], 16) / 255.0,
+                               int(color.group(1)[4:6], 16) / 255.0)
 
-        return pen_colour, pen_width, brush_colour
+        if 'p' in flags:
+            dash_pattern = DashPattern([4,3], 0)
+            
+        return (line_color, line_width, fill_color, dash_pattern)
 
-    def DrawMapMazeCorridors(self, dc, flags, coord_list):
+    def _normalize_point_list(self, coord_list):
+        if not coord_list or not isinstance(coord_list, list) or len(coord_list) % 2 != 0:
+            raise MapDataFormatError('Coordinate list must have an even number of elements')
+
+        points = []
+        for x,y in zip(coord_list[0::2], coord_list[1::2]):
+            p = self._pos_map2tk(Point(x,y))
+            points.append(p.x)
+            points.append(p.y)
+
+        return points
+
+    def draw_map_maze_corridors(self, flags, coord_list):
         "[Mflags, [x0, y0, x1, y1, ..., xn, yn]] -> draw a maze of twisty passages"
-        stdpen, stdwidth, stdbrush = self._standard_colour(flags)
+        line_color, line_width, fill_color, dash_pattern = self._color_from_flags(flags)
+        points = self._normalize_point_list(coord_list)
+
         if 'a' in flags:
-            # fill in area specified by coordinates
-            fill_colour = self._colour_map2wx(*stdbrush)
-            dc.SetPen(wx.Pen(fill_colour))
-            dc.SetBrush(wx.Brush(fill_colour))
-            dc.DrawPolygon([self._pos_map2wx(x,y) for x,y in zip(*[coord_list[i::2] for i in range(2)])])
+            self.canvas.create_polygon(*points, fill=fill_color.rgb, smooth=1 if 'c' in flags else 0,
+                splinesteps=self.spline_points, width=0)
         if 'w' in flags:
-            # stroke path around area, may not necessarily be closed
-            self.SetMapLineWidth(dc, stdwidth)
-            self.SetMapColour(dc, *stdpen)
-            self.SetMapDashPattern(dc, [4,3] if 'p' in flags else None, 0)
-            dc.SetPen(self.MMap_CurrentPen)
-            if 'c' in flags:
-                dc.DrawSpline([self._pos_map2wx(x,y) for x,y in zip(*[coord_list[i::2] for i in range(2)])])
+            if dash_pattern is None:
+                self.canvas.create_line(*points, fill=line_color.rgb, width=line_width, 
+                    smooth=1 if 'c' in flags else 0, splinesteps=self.spline_points)
             else:
-                dc.DrawLines([self._pos_map2wx(x,y) for x,y in zip(*[coord_list[i::2] for i in range(2)])])
-            self.SetMapLineWidth(dc, 1)
-            self.SetMapDashPattern(dc)
+                self.canvas.create_line(*points, dash=dash_pattern.pattern, 
+                    dashoffset=dash_pattern.offset, fill=line_color.rgb, width=line_width, 
+                    smooth=1 if 'c' in flags else 0, splinesteps=self.spline_points)
 
-    def DrawMapNumberBox(self, dc, x, y, text):
+    def draw_map_number_box(self, x, y, text):
         "[N, x, y, text] -> draw text in an unfilled 20x20 box at (x,y) in the current color and font"
-        self.DrawMapBox(dc, x, y, 20, 20)
-        self.DrawMapText(dc, x+10, y+10, text, center_on_xy=True)
+        self.draw_map_box(x, y, 20, 20)
+        self.draw_map_text(Point(x+10, y+10), text, center_on_xy=True)
 
-    def DrawMapDotMark(self, dc, flags, x, y, radius):
-        "[O, x, y, radius] -> draw filled dot centered at (x,y) in current color"
-        dc.SetPen(self.MMap_CurrentPen)
-        dc.SetBrush(self.MMap_CurrentBrush if 'f' in flags else wx.TRANSPARENT_BRUSH)
-        x, y = self._pos_map2wx(x, y)
-        dc.DrawCircle(x, y, radius)
+    def draw_map_dot_mark(self, flags, x, y, radius):
+        "[O, x, y, radius] -> draw possibly-filled dot centered at (x,y) in current color"
+        p1 = self._pos_map2tk(Point(x-radius, y+radius))
+        p2 = self._pos_map2tk(Point(x+radius, y-radius))
+        if self.current_dash_pattern is None:
+            self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, 
+                fill=self.current_color.rgb if 'f' in flags else '',
+                outline=self.current_color.rgb, width=self.current_line_width)
+        else:
+            self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, 
+                dash=self.current_dash_pattern.pattern, dashoffset=self.current_dash_pattern.offset,
+                fill=self.current_color.rgb if 'f' in flags else '',
+                outline=self.current_color.rgb, width=self.current_line_width)
 
-    def DrawMapArc(self, dc, flags, vlist):
+    def draw_map_arc(self, flags, vlist):
         "[Qflags, x, y, radius, start, end] -> draw (maybe fill) an arc"
         if len(vlist) != 5:
             raise InvalidDrawingElement('Arc object should specify 5 data elements; {0} given'.format(len(vlist)))
         x, y, r, s, e = vlist
-        dc.SetPen(self.MMap_CurrentPen)
-        dc.SetBrush(self.MMap_CurrentBrush if 'f' in flags else wx.TRANSPARENT_BRUSH)
-        x, y = self._pos_map2wx(x, y)
-        dc.DrawEllipticArc(x - r, y - r, r*2.0, r*2.0, s, e)
+        p1 = self._pos_map2tk(Point(x-r, y+r))
+        p2 = self._pos_map2tk(Point(x+r, y-r))
+        s = s % 360
+        e = e % 360
 
-    def DrawMapPolygon(self, dc, flags, coord_list):
+        opts = {
+            'outline': self.current_color.rgb,
+            'width': self.current_line_width,
+            'start': s,
+            'extent': (e - s) % 360,
+            'style': tk.ARC,
+        }
+        if self.current_dash_pattern is not None:
+            opts['dash'] = self.current_dash_pattern.pattern
+            opts['dashoffset'] = self.current_dash_pattern.offset
+        if 'f' in flags:
+            opts['fill'] = self.current_color.rgb
+            opts['style'] = tk.PIESLICE
+
+        self.canvas.create_arc(p1.x, p1.y, p2.x, p2.y, **opts)
+
+    def draw_map_polygon(self, flags, coord_list):
         "[Pflags, [x0, y0, x1, y1, ..., xn, yn]] -> draw (maybe fill) polygon through points"
-        dc.SetPen(self.MMap_CurrentPen)
-        dc.SetBrush(self.MMap_CurrentBrush)
+        points = self._normalize_point_list(coord_list)
 
         if 'b' in flags:
-            # convert point list to Bezier curve points
-            coord_list = (make_bezier([(x,y) for x, y in zip(*[coord_list[i::2] for i in range(2)])]))(self.Bezier_range)
-            coord_list = [pt for pt in itertools.chain(*coord_list)]
+            #
+            # coord list are set of control points for Bézier curve; convert that to the
+            # actual points now
+            #
+            coord_tuple_list = make_bezier([(x,y) for x,y in zip(coord_list[0::2], coord_list[1::2])])(self.Bezier_range)
+            points = self._normalize_point_list([p for p in itertools.chain(*coord_tuple_list)])
+        
+        opts = {
+            'smooth': 0,
+            'width': self.current_line_width,
+        }
+
+        if 's' in flags:
+            opts['smooth'] = 1
+            opts['splinesteps'] = self.spline_points
+
+        if self.current_dash_pattern is not None:
+            opts['dash'] = self.current_dash_pattern.pattern
+            opts['dashoffset'] = self.current_dash_pattern.offset
 
         if 'f' in flags:
-            dc.DrawPolygon([self._pos_map2wx(x,y) for x,y in zip(*[coord_list[i::2] for i in range(2)])])
-        elif 's' in flags:
-            dc.DrawSpline([self._pos_map2wx(x,y) for x,y in zip(*[coord_list[i::2] for i in range(2)])])
+            self.canvas.create_polygon(*points, fill=self.current_color.rgb,
+                outline=self.current_color.rgb, **opts)
+        elif 'c' in flags:
+            self.canvas.create_polygon(*points, outline=self.current_color.rgb, **opts)
         else:
-            #if 'c' in flags:
-            #    coord_list.extend(coord_list[0:2])
-            dc.DrawLines([self._pos_map2wx(x,y) for x,y in zip(*[coord_list[i::2] for i in range(2)])])
+            self.canvas.create_line(*points, fill=self.current_color.rgb, **opts)
 
-    def DrawMapRoom(self, dc, flags, x, y, w, h, t1, t2, exits):
+    def draw_map_room(self, flags, x, y, w, h, t1, t2, exits):
         "[Rflags, x, y, w, h, title1, title2, [[dir,len]...]] -> room"
         if w == 'R' or w == 'r':
-            return self.DrawMapRoundRoom(dc, flags, x, y, h, t1, t2, exits)
+            return self.draw_map_round_room(flags, x, y, h, t1, t2, exits)
 
-        stdpen, stdwidth, stdbrush = self._standard_colour(flags)
-        self.SetMapDashPattern(dc)
-        self.DrawMapAreaFill(dc, x, y, w, h, *(stdbrush))
-        self.SetMapColour(dc, *stdpen)
-        self.SetMapLineWidth(dc, stdwidth)
-        if 'p' in flags: self.SetMapDashPattern(dc, [4,3], 0)
-        self.DrawMapBox(dc, x, y, w, h)
-        if 'p' in flags: self.SetMapDashPattern(dc)
+        line_color, line_width, fill_color, dash_pattern = self._color_from_flags(flags)
+        #
+        # Standard rectangular room
+        #
+        opts = {
+            'fill': fill_color.rgb,
+            'outline': line_color.rgb,
+            'width': line_width,
+        }
+        if dash_pattern is not None:
+            opts['dash'] = dash_pattern.pattern
+            opts['dashoffset'] = dash_pattern.offset
+
+        p1 = self._pos_map2tk(Point(x, y+h))
+        p2 = self._pos_map2tk(Point(x+w, y))
+        self.canvas.create_rectangle(p1.x, p1.y, p2.x, p2.y, **opts)
         #
         # titles
         #
-        self.SetMapColour(dc, 0,0,0)
-        self.SetMapFont(dc, 't',8)
-        cx = x + w/2.0
-        cy = y + h/2.0
+        self.set_map_color(GreyLevel(0))
+        self.set_map_font(FontSelection('t',8))
+        cx = x + w/2
+        cy = y + h/2
         if t2:
-            self.DrawMapText(dc, cx, cy + max(4, h/8.0), t1, center_on_xy=True)
-            self.DrawMapText(dc, cx, cy - max(4, h/8.0), t2, center_on_xy=True)
+            self._draw_map_text(cx, cy + max(4, h/8), t1, center_on_xy=True)
+            self._draw_map_text(cx, cy - max(4, h/8), t2, center_on_xy=True)
         else:
-            self.DrawMapText(dc, cx, cy, t1, center_on_xy=True)
+            self._draw_map_text(cx, cy, t1, center_on_xy=True)
 
-        self._handle_exits(dc, exits, cx, cy, w/2.0, h/2.0, w/2.0, h/2.0)
+        self._handle_exits(exits, Point(cx, cy), Point(w/2, h/2), Point(w/2, h/2),
+            (line_color, line_width, fill_color, dash_pattern))
 
-    def _handle_exits(self, dc, exits, Cx, Cy, Rx, Ry, RRx, RRy, use_tilting=False):
-        vectors = { 
-                'n':    (  +0,  +Ry, +0, +1, False),
-                's':    (  +0,  -Ry, +0, -1, False),
-                'e':    ( +Rx,   +0, +1, +0, False),
-                'w':    ( -Rx,   +0, -1, +0, False),
-                'a':    (+RRx, +RRy, +1, +1, True ),
-                'b':    (+RRx, -RRy, +1, -1, True ),
-                'c':    (-RRx, +RRy, -1, +1, True ),
-                'd':    (-RRx, -RRy, -1, -1, True ),
+    def _handle_exits(self, exits, center, R, RR, colors, use_tilting=False):
+        line_color, line_width, fill_color, dash_pattern = colors
+        vectors = { #    V                    V2              L              Tilted?
+                'n':    (Point(   +0,  +R.y), Point  (+0,+R.y), Point(+0, +1), False),
+                's':    (Point(   +0,  -R.y), Point(  +0,-R.y), Point(+0, -1), False),
+                'e':    (Point( +R.x,    +0), Point(+R.x,  +0), Point(+1, +0), False),
+                'w':    (Point( -R.x,    +0), Point(-R.x,  +0), Point(-1, +0), False),
+                'a':    (Point(+RR.x, +RR.y), Point(+R.x,+R.y), Point(+1, +1), True ),
+                'b':    (Point(+RR.x, -RR.y), Point(+R.x,-R.y), Point(+1, -1), True ),
+                'c':    (Point(-RR.x, +RR.y), Point(-R.x,+R.y), Point(-1, +1), True ),
+                'd':    (Point(-RR.x, -RR.y), Point(-R.x,-R.y), Point(-1, -1), True ),
         }
 
-        def extended(x, y, xlen, ylen, code):
+        def extended(start, length, code):
             if 'x' in code:
-                maxX, maxY = (700,580) if self.MMap_LandscapePage else (580,700)
-                minX, minY = (30,30)
-                return max(min(x + (xlen*100000), maxX), minX), max(min(y + (ylen*100000), maxY), minY)
-            return x+xlen, y+ylen
+                max_point = Point(700,580) if self.landscape else Point(580,700)
+                min_point = Point(30,30)
+                return Point(
+                    max(min(start.x + length.x * 100000, max_point.x), min_point.x),
+                    max(min(start.y + length.y * 100000, max_point.y), min_point.y),
+                )
+            return start + length
 
         for direction_code, corridor_length in exits:
-            Vx, Vy, Lx, Ly, tilted = vectors[direction_code[0]]
+            if direction_code[0] not in vectors:
+                raise InvalidDrawingElement('Room exit direction code {} is not valid.'.format(direction_code))
+            V, V2, L, tilted = vectors[direction_code[0]]
             if not use_tilting:
                 tilted = False
-            Xx, Xy = Cx+Vx, Cy+Vy                # exit point in map coords
-            XXx, XXy = self._pos_map2wx(Xx, Xy)  # exit point in screen coords
+            
             if corridor_length > 0:
-                self.SetMapLineWidth(dc, 1)
-                self.SetMapColour(dc, *self.MMap_IndoorColour)
-                self.SetMapDashPattern(dc, [4,3] if '!' in direction_code else None, 0)
-                endX, endY = extended(Xx, Xy, corridor_length*Lx, corridor_length*Ly, direction_code)
-                XendX, XendY = self._pos_map2wx(endX, endY)
+                # draw line from center+V to the point length*L from there in x and y directions
+                #print("corridor length {0} from center ({1.x},{1.y}) + vector ({2.x},{2.y}) code {3}".format(
+                #    corridor_length, center, V, direction_code
+                #))
+                start_point = center + V
+                L.scale(corridor_length)
+                end_point = extended(center + V2, L, direction_code)
+
+                opts = {
+                    'width': 1,
+                    'fill': line_color.rgb,
+                }
                 if 'i' in direction_code:
-                    self.DrawMapVector(dc, endX, endY, Xx, Xy)
+                    if 'o' in direction_code:
+                        opts['arrow'] = tk.BOTH
+                    else:
+                        opts['arrow'] = tk.FIRST
                 elif 'o' in direction_code:
-                    self.DrawMapVector(dc, Xx, Xy, endX, endY)
-                else:
-                    dc.SetPen(self.MMap_CurrentPen)
-                    dc.DrawLine(XXx, XXy, XendX, XendY)
+                    opts['arrow'] = tk.LAST
 
-            if 'D' in direction_code:
-                dc.SetPen(wx.BLACK_PEN)
-                dc.SetBrush(wx.WHITE_BRUSH)
+                if '!' in direction_code:
+                    opts['dash'] = [4,2]
+                    opts['dashoffset'] = 0
+
+                p1 = self._pos_map2tk(start_point)
+                p2 = self._pos_map2tk(end_point)
+
+                self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, **opts)
+
+            if 'D' in direction_code or 'L' in direction_code:
+                #
+                # Door in this wall (regardless of if there's an actual corridor)
+                #
                 if tilted:
-                    dc.DrawPolygon([(XXx,XXy-6), (XXx+6,XXy), (XXx,XXy+6), (XXx-6,XXy)])
+                    #
+                    # Rotate the door 45 degrees to fit into a round room
+                    #
+                    p1 = self._pos_map2tk(start_point + Point(0,-6))
+                    p2 = self._pos_map2tk(start_point + Point(+6,0))
+                    p3 = self._pos_map2tk(start_point + Point(0,+6))
+                    p4 = self._pos_map2tk(start_point + Point(-6,0))
                 else:
-                    dc.DrawPolygon([(XXx-4,XXy-4), (XXx-4,XXy+4), (XXx+4,XXy+4), (XXx+4,XXy-4)])
+                    p1 = self._pos_map2tk(start_point + Point(-4,-4))
+                    p2 = self._pos_map2tk(start_point + Point(-4,+4))
+                    p3 = self._pos_map2tk(start_point + Point(+4,+4))
+                    p4 = self._pos_map2tk(start_point + Point(+4,-4))
+                    
+                self.canvas.create_polygon(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y,
+                   fill=fill_color.rgb, outline=line_color.rgb, width=line_width)
+
             if 'L' in direction_code:
-                dc.SetPen(wx.BLACK_PEN)
-                dc.SetBrush(wx.BLACK_BRUSH)
-                dc.DrawCircle(XXx, XXy, 2)
+                p1 = self._pos_map2tk(start_point + Point(-1,+1))
+                p2 = self._pos_map2tk(start_point + Point(+1,-1))
+                self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, fill=line_color.rgb,
+                    outline=line_color.rgb, width=1)
 
-    def DrawMapRoundRoom(self, dc, flags, x, y, radius, t1, t2, exits):
-        stdpen, stdwidth, stdbrush = self._standard_colour(flags)
-        dc.SetPen(wx.Pen(self._colour_map2wx(*stdbrush)))
-        dc.SetBrush(wx.Brush(self._colour_map2wx(*stdbrush)))
-        xx, yy = self._pos_map2wx(x, y)
-        dc.DrawCircle(xx, yy, radius)
+    def draw_map_round_room(self, flags, x, y, radius, t1, t2, exits):
+        line_color, line_width, fill_color, dash_pattern = self._color_from_flags(flags)
 
-        self.SetMapColour(dc, *stdpen)
-        self.SetMapLineWidth(dc, stdwidth)
-        self.SetMapDashPattern(dc, [4,3] if 'p' in flags else None, None)
-        dc.SetPen(self.MMap_CurrentPen)
-        dc.SetBrush(wx.TRANSPARENT_BRUSH)
-        dc.DrawCircle(xx, yy, radius)
-        if 'p' in flags: self.SetMapDashPattern(dc)
-        self.SetMapLineWidth(dc, self.MMap_IndoorWidth)
-        self.SetMapColour(dc, 0,0,0)
+        p1 = self._pos_map2tk(Point(x-radius, y+radius))
+        p2 = self._pos_map2tk(Point(x+radius, y-radius))
+
+        opts = {
+            'fill': fill_color.rgb,
+            'outline': line_color.rgb,
+            'width': line_width,
+        }
+        if dash_pattern is not None:
+            opts['dash'] = dash_pattern.pattern
+            opts['dashoffset'] = dash_pattern.offset
+
+        self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, **opts)
+
         #
         # titles
         #
-        self.SetMapFont(dc, 't',8)
+        self.set_map_color(GreyLevel(0))
+        self.set_map_font(FontSelection('t',8))
         if t2:
-            self.DrawMapText(dc, x, y + max(4, radius/6.0), t1, center_on_xy=True)
-            self.DrawMapText(dc, x, y - max(4, radius/6.0), t2, center_on_xy=True)
+            self._draw_map_text(x, y + max(4, radius/6), t1, center_on_xy=True)
+            self._draw_map_text(x, y - max(4, radius/6), t2, center_on_xy=True)
         else:
-            self.DrawMapText(dc, x, y, t1, center_on_xy=True)
+            self._draw_map_text(x, y, t1, center_on_xy=True)
 
-        self._handle_exits(dc, exits, x, y, radius, radius, radius*.7071, radius*.7071, True)
+        self._handle_exits(exits, Point(x, y), Point(radius, radius), Point(radius*.7071, radius*.7071), 
+            (line_color, line_width, fill_color, dash_pattern), True)
 
-    def DrawMapText(self, dc, x, y, text, center_on_xy=False):
+        
+    def _draw_map_text(self, x, y, text, center_on_xy=False):
+        self.draw_map_text(Point(x,y), text, center_on_xy)
+
+    def draw_map_text(self, point, text, center_on_xy=False):
         "[S, x, y, text] -> text drawn at (x,y) in current font/color"
-        utext = str()
-        translation_table = {
-                '\320': chr(0x2014),  # em dash ---
-                '\261': chr(0x2013),  # en dash --
-                '\242': chr(0x00a2),  # cent sign
-                '\262': chr(0x2020),  # dagger
-                '\263': chr(0x2021),  # double dagger
-                '\252': chr(0x201c),  # open quotes  ``
-                '\272': chr(0x201d),  # close quotes ''
-                '\267': chr(0x2022),  # bullet
-                '\341': chr(0x01fc),  # AE
-                '\361': chr(0x00e6),  # ae
-                '\247': chr(0x00a7),  # section
-                '\266': chr(0x00b6),  # paragraph
-                '\253': chr(0x00ab),  # <<
-                '\273': chr(0x00bb),  # >>
-        }
-        for ch in text:
-            if ch in translation_table:
-                utext += translation_table[ch]
-            else:
-                utext += ch
 
-        if self.MMap_CurrentFont[0] not in self.FontCodeTranslation:
-            raise InvalidDrawingElement('Font code {0} not understood.'.format(self.MMap_CurrentFont[0]))
+        point = self._pos_map2tk(point)
+        self.canvas.create_text(point.x, point.y, anchor=tk.CENTER if center_on_xy else tk.SW,
+            fill=self.current_color.rgb, font=self.current_font, text=text)
 
-        dc.SetFont(wx.Font(self.MMap_CurrentFont[1] * self.font_magnification, *self.FontCodeTranslation[self.MMap_CurrentFont[0]]))
-        dc.SetTextForeground(self.MMap_CurrentColour)
-        dc.SetBackgroundMode(wx.TRANSPARENT)
-        xw, xh = dc.GetTextExtent(utext)
-        x, y = self._pos_map2wx(x, y)
-        if center_on_xy:
-            # adjust x,y so that the text ends up being centered on that point
-            x -= xw/2
-            y -= xh/2
-        else:
-            # adjust y so it uses the top left corner, not the bottom left.
-            y -= xh
-        dc.DrawText(utext, x, y)
-
-    def DrawMapTree(self, dc, flags, Ox, Oy):
+    def draw_map_tree(self, flags, Ox, Oy):
         "[Tflags, x, y] -> tree sort-of-at (x,y)"
 
         if 'c' in flags:
             if '2' in flags:
-                self._DrawMapTree(dc, Ox-15, Oy-5, scale=.5)
-                self._DrawMapTree(dc, Ox, Oy+12, scale=.5)
-                self._DrawMapTree(dc, Ox+14, Oy+2, scale=.5)
+                self._DrawMapTree(Ox-15, Oy-5, scale=.5)
+                self._DrawMapTree(Ox, Oy+12, scale=.5)
+                self._DrawMapTree(Ox+14, Oy+2, scale=.5)
             else:
-                self._DrawMapTree(dc, Ox+12, Oy+12, scale=.5)
-                self._DrawMapTree(dc, Ox, Oy+12, scale=.5)
-                self._DrawMapTree(dc, Ox+12, Oy, scale=.5)
+                self._DrawMapTree(Ox+12, Oy+12, scale=.5)
+                self._DrawMapTree(Ox, Oy+12, scale=.5)
+                self._DrawMapTree(Ox+12, Oy, scale=.5)
         elif '2' in flags:
-            self._DrawMapTree(dc, Ox, Oy, scale=.5, alt=True)
+            self._DrawMapTree(Ox, Oy, scale=.5, alt=True)
         else:
-            self._DrawMapTree(dc, Ox, Oy, scale=.5)
+            self._DrawMapTree(Ox, Oy, scale=.5)
 
-    def _DrawMapTree(self, dc, Ox, Oy, scale=3, alt=False):
-        fill = wx.Brush((34,139,34))
-        no_fill = wx.TRANSPARENT_BRUSH
-        black = wx.Pen((0,0,0), 1)
-
-        dc.SetBrush(wx.Brush((34,139,34)))
-        for x, y, r, a1, a2, pen, brush in (
-                (16, 16, 11,  0,   0, wx.TRANSPARENT_PEN, fill),
-                (20, 22, 7, -20, 120, black,              fill),
-                (12, 25, 6,  20, 200, black,              fill),
-                ( 6, 19, 4,  60, 260, black,              fill),
-                (12, 12, 8, 150, 280, black,              fill),
-                (16,  6, 3,-180,  10, black,              fill),
-                (22, 10, 5,-140,  80, black,              fill),
-                (27, 17, 4,-130, 120, black,              fill),
-                (15, 18, 3,  40, 200, black,           no_fill),
-                (20, 13, 3,  60,-120, black,           no_fill)
+    def _DrawMapTree(self, Ox, Oy, scale=3, alt=False):
+        green = '#228b22'
+        black = '#000000'
+        for center, radius, start, end, outline, fill in (
+            (Point(16, 16), 11,  0,   0, green, green),
+            (Point(20, 22), 7, -20, 120, black, green),
+            (Point(12, 25), 6,  20, 200, black, green),
+            (Point( 6, 19), 4,  60, 260, black, green),
+            (Point(12, 12), 8, 150, 280, black, green),
+            (Point(16,  6), 3,-180,  10, black, green),
+            (Point(22, 10), 5,-140,  80, black, green),
+            (Point(27, 17), 4,-130, 120, black, green),
+            (Point(15, 18), 3,  40, 200, black, ''),
+            (Point(20, 13), 3,  60,-120, black, ''),
         ):
+            center.scale(scale)
             if alt:
-                xx, yy = self._pos_map2wx(Ox+(x*scale)-(r*scale)-(35*scale), Oy+(y*scale)+(r*scale))
+                p1 = self._pos_map2tk(center + Point(Ox-radius*scale-35*scale, Oy+radius*scale))
             else:
-                xx, yy = self._pos_map2wx(Ox+(x*scale)-(r*scale), Oy+(y*scale)+(r*scale))
-            dc.SetPen(pen)
-            dc.DrawEllipticArc(xx, yy, 2*r*scale, 2*r*scale, a1, a2)
+                p1 = self._pos_map2tk(center + Point(Ox-radius*scale, Oy+radius*scale))
+            # XXX this needs to scale with the graphics state
+            self.canvas.create_arc(p1.x, p1.y, p1.x+2*radius*scale, p1.y+2*radius*scale,
+                style=tk.PIESLICE, fill=fill, outline=outline, start=start, extent=end-start)
+                    
+    def _draw_map_vector(self, x1, y1, x2, y2):
+        "[V, x1, y1, x2, y2] -> arrow from (x1,y1) to (x2,y2) pointing to (x2,y2) in current color."
+        self.draw_map_vector(Point(x1, y1), Point(x2, y2))
 
-    def DrawMapVector(self, dc, x1, y1, x2, y2, L=5, spread=120):
-        "[V, x1, y1, x2, y2] -> arrow from (x1,y1) to (x2,y2) pointing to (x2,y2) in current color; L=arrowhead length; spread=degrees from terminal point to fin points"
-        #
-        # Given a vector from point 1 to 2 (x1,y1)-(x2,y2),
-        # we need to draw an arrow head of size L, with fins 
-        # pointing back L (so really the total size is 2L),
-        # with the arrow tip at point 2 (x2, y2).
-        #
-        # The easiest way to picture this (to me, anyway) is
-        # to have the arrow points 120 degrees around a circle
-        # which circumscribes the arrow head.  So we need to
-        # determine the center point (C) of that circle.  To do
-        # that, we need to know the vector's length (r) and angle
-        # from the x axis (theta).
-        #
-        dy = y2 - y1
-        dx = x2 - x1
-        r = math.sqrt(dx**2 + dy**2)
-        theta = math.atan2(dy, dx)
-        Cx = (r-L) * math.cos(theta) + x1
-        Cy = (r-L) * math.sin(theta) + y1
-        #
-        # Now we know the point of arrow is tangent to the circle
-        # centered at point C with radius L, at angle theta.  The 
-        # other two points of the arrowhead (A and B) are +/-
-        # <spread> degrees from there.
-        #
-        sr = math.radians(spread)
+    def draw_map_vector(self, p1, p2):
+        sp1 = self._pos_map2tk(p1)
+        sp2 = self._pos_map2tk(p2)
+        if self.current_dash_pattern is None:
+            self.canvas.create_line(sp1.x, sp1.y, sp2.x, sp2.y, arrow=tk.LAST, 
+                fill=self.current_color.rgb, width=self.current_line_width)
+        else:
+            self.canvas.create_line(sp1.x, sp1.y, sp2.x, sp2.y, arrow=tk.LAST, 
+                dash=self.current_dash_pattern.pattern,
+                dashoffset=self.current_dash_pattern.offset,
+                fill=self.current_color.rgb, width=self.current_line_width)
+#
+    def _set_map_color(self, r, g, b):  self.set_map_color(Color(r,g,b))
+    def _set_map_font(self, f, size):   self.set_map_font(FontSelection(f[0], size))
+    def _set_translation(self, dx, dy): self.set_translation(Point(dx, dy))
+    def _set_scale_factor(self, x, y):  self.set_scale_factor(Point(x, y))
+    def _set_line_width(self, lw):      self.set_line_width(lw)
 
-        Ax = L * math.cos(theta + sr) + Cx
-        Ay = L * math.sin(theta + sr) + Cy
-
-        Bx = L * math.cos(theta - sr) + Cx
-        By = L * math.sin(theta - sr) + Cy
+    def set_map_color(self, new_color): self.current_color = new_color
+    def set_map_font(self, new_font):   
         #
-        # Now we have the coordinates of all the bits of the arrow
-        # we need, just draw the thing!
+        # set_map_font(FontSelection(flag, size))
         #
-        dc.SetPen(self.MMap_CurrentPen)
-        dc.SetBrush(self.MMap_CurrentBrush)
-        A = self._pos_map2wx(Ax, Ay)
-        B = self._pos_map2wx(Bx, By)
-        C = self._pos_map2wx(Cx, Cy)
-        P1 = self._pos_map2wx(x1, y1)
-        P2 = self._pos_map2wx(x2, y2)
-        dc.DrawLines([P1, P2])
-        dc.DrawPolygon([C, A, P2, B])
+        # font_code_translation[flag] = FontDetail object (size may be None)
+        # font_cache[name@size] = tk.Font object
+        #
+        key = "{}@{}".format(new_font.name,new_font.size)
+        if key not in self.font_cache:
+            if new_font.name not in self.font_code_translation:
+                raise MapDataFormatError('Undefined font code {} requested'.format(new_font.name))
+            fd = self.font_code_translation[new_font.name]
+            if fd.object and fd.size == new_font.size:
+                self.font_cache[key] = fd.object
+            else:
+                self.font_cache[key] = font.Font(family=fd.family, size=new_font.size, slant=fd.slant, weight=fd.weight)
+        self.current_font = self.font_cache[key]
 
-    def SetMapColour(self, dc, r, g, b):
-        "[C, r, g, b] -> current drawing colour changed"
-        self.MMap_CurrentColour = self._colour_map2wx(r, g, b)
-        self.MMap_CurrentBrush = wx.Brush(self.MMap_CurrentColour)
-        self._update_current_pen()
+    def set_translation(self, new_dxy): self.current_translation = new_dxy
+    def set_scale_factor(self, new_sc): self.current_scale = new_sc
+    def set_line_width(self, lw):       self.current_line_width = lw
 
-    def SetMapDashPattern(self, dc, mslist=None, offset=None):
+    def _set_map_dash_pattern(self, pattern, offset):   
+        self.set_map_dash_pattern(DashPattern(pattern, offset))
+
+    def set_map_dash_pattern(self, dashpattern):
         "[D, [mark, space, ...], offset] -> current drawing dash pattern changed"
-        if mslist:
-            self.MMap_CurrentDashes = (mslist, offset)
+        if dashpattern.pattern:
+            if not isinstance(dashpattern.pattern, list) or len(dashpattern.pattern) % 2 != 0:
+                raise MapDataFormatError('Dash pattern must be a list with even number of elements')
+            self.current_dash_pattern = dashpattern
         else:
-            self.MMap_CurrentDashes = None
-        self._update_current_pen()
+            # if the pattern is empty, we set the default pattern (solid line)
+            self.current_dash_pattern = None
 
-    def SetMapLineWidth(self, dc, width):
-        "[L, width] -> current line drawing width changed"
-        self.MMap_CurrentWidth = width
-        self._update_current_pen()
+    def _image_tk_id(self, image_id=None, file=None):
+        if image_id is not None:
+            key = '@'+image_id
+            if key not in self.image_cache:
+                # XXX retrieve image
+                file = os.path.join(os.path.expanduser(
+                    self.image_dir or self.config.get('preview', 'image_dir')), image_id + '.gif')
+                self.image_cache[key] = tk.PhotoImage(file=file)
+            return self.image_cache[key]
 
-    def _update_current_pen(self):
-        if self.MMap_CurrentDashes is None:
-            self.MMap_CurrentPen = wx.Pen(self.MMap_CurrentColour, self.MMap_CurrentWidth, wx.SOLID)
+        if file is not None:
+            if file not in self.image_cache:
+                self.image_cache[file] = tk.PhotoImage(file=file)
+            return self.image_cache[file]
+        
+    def refresh(self, graph_paper=None):
+        if graph_paper is not None:
+            self.graph_paper_mode = graph_paper
         else:
-            self.MMap_CurrentPen = wx.Pen(self.MMap_CurrentColour, self.MMap_CurrentWidth, wx.USER_DASH)
-            self.MMap_CurrentPen.SetDashes(self.MMap_CurrentDashes[0])
-            # XXX not using offset yet
+            graph_paper = self.graph_paper_mode
 
-    def SetMapFont(self, dc, font_code, size):
-        "[Ffont, size] -> current font changed"
-        if '@' in font_code:
-            font_code = font_code.replace('@','')  # we don't recognize this flag
-        self.MMap_CurrentFont = (font_code, size)
+        self._reset_defaults()
+        
+        self.canvas.delete('all')
 
-    def RenderMapToDC(self, dc):
-        #dc = wx.PaintDC(self)
-        dc.BeginDrawing()
-        dc.Clear()
-        dc.SetMapMode(wx.MM_POINTS)
-        self.MMap_DarkColour = (.7,.7,.7)
-        self.MMap_LightColour = (1,1,1)
-        self.MMap_OutdoorColour = (.5,.5,.5)
-        self.MMap_IndoorColour  = (0,0,0)
-        self.MMap_OutdoorWidth = 2
-        self.MMap_IndoorWidth = 1
-
-        self.MMap_HereDarkColour = (.7,.7,.0)
-        self.MMap_HereLightColour = (1,1,0)
-        self.MMap_HereOutdoorColour = (.5,.5,.0)
-        self.MMap_HereIndoorColour  = (1,0,0)
-
-        self.MMap_LandscapePage=False
-        self.MMap_CurrentColour = (0,0,0)
-        self.MMap_CurrentWidth = 1
-        self.MMap_CurrentDashes = None
         #
-        # tile image
+        # tile background image across drawing area
         #
-        #fr_w, fr_h = self.GetClientSizeTuple()
-        fr_w, fr_h = self.GetVirtualSize()
-
-        for x in range(0, fr_w, self.bg_w):
-            for y in range(0, fr_h, self.bg_h):
-                dc.DrawBitmap(self.bg_tile, x, y, True)
+        for x in range(0, self.canvas_w, self.bg_w):
+            for y in range(0, self.canvas_h, self.bg_h):
+                self.canvas.create_image(x, y, anchor=tk.NW, image=self.bg_image, tags=['#bg', '#sys'])
         #
         # logo
         #
-        dc.DrawBitmap(self.logo_image, 0, 0, True)
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.logo_image, tags=['#logo', '#sys'])
+
         if self.page_obj:
             #
             # annotations
             #
-            self.SetMapFont(dc, self.page_number_font, self.page_number_size)
-            self.SetMapColour(dc, 0,0,0)
-            self.DrawMapText(dc, self.page_number_x, self.page_number_y, '{{{0}}}'.format(self.page_obj.page))
-            self.SetMapFont(dc, self.page_title_font, self.page_title_size)
-            if self.page_obj.realm is not None:
-                self.DrawMapText(dc, self.page_title_x, self.page_title_y, self.page_obj.realm)
-            if self.page_obj.creators:
-                self.DrawMapText(dc, self.page_title2_x, self.page_title2_y, '[{0}]'.format(', '.join(self.page_obj.creators)))
-            else:
-                self.DrawMapText(dc, self.page_title2_x, self.page_title2_y, '[Base world map]')
-            #page, realm [creators]
+            self.set_map_font(FontSelection(self.page_number_font, self.page_number_size))
+            self.set_map_color(GreyLevel(0))
+            self.draw_map_text(self.page_number_location, '{{{0}}}'.format(self.page_obj.page))
 
-            self.MMap_LandscapePage = self.page_obj.orient == RagnarokMUD.MagicMapper.MapPage.LANDSCAPE
+            self.set_map_font(FontSelection(self.page_title_font, self.page_title_size))
+            if self.page_obj.realm is not None:
+                self.draw_map_text(self.page_title_location, self.page_obj.realm)
+            if self.page_obj.creators:
+                self.draw_map_text(self.page_title2_location, '[{}]'.format(', '.join(self.page_obj.creators)))
+            else:
+                self.draw_map_text(self.page_title2_location, '[Base world map]')
+
+            self.landscape = self.page_obj.orient == RagnarokMUD.MagicMapper.MapPage.LANDSCAPE
+            if graph_paper:
+                self.draw_graph_paper()
+
             page_context = 'Magic Map Page {0}{1}'.format(
                 self.page_obj.page,
                 ' ('+self.page_obj.realm+')' if self.page_obj.realm else ''
             )
-            self._render_map_element_list(dc, '{0}, Background'.format(page_context), self.page_obj.bg)
+            #
+            # Draw page background
+            #
+            self._render_map_element_list('{0}, Background'.format(page_context), self.page_obj.bg)
 
+            #
+            # Draw rooms
+            #
             for room in list(self.page_obj.rooms.values()):
                 self._render_map_element_list(
-                        dc, 
                         '{0}, Room {1}{2}'.format(
                             page_context,
                             room.id,
@@ -630,25 +717,28 @@ class MapCanvas (wx.ScrolledWindow):
                         room.id == self.current_location
                 )
 
+            #
+            # Crosshairs
+            #
             if self.current_location is not None:
                 if self.current_location in self.page_obj.rooms:
                     this_room = self.page_obj.rooms[self.current_location]
                     if this_room.reference_point is not None:
-                        self.SetMapColour(dc, 1,0,0)
-                        self.SetMapLineWidth(dc, 1)
-                        self.SetMapDashPattern(dc, [4,10], 0)
-                        dc.SetPen(self.MMap_CurrentPen)
-                        dc.CrossHair(*self._pos_map2wx(*this_room.reference_point))
-                        self.SetMapDashPattern(dc)
-        dc.EndDrawing()
+                        self.cross_hair(self._pos_map2tk(Point(*this_room.reference_point)))
+        elif graph_paper:
+            self.draw_graph_paper()
 
+    def cross_hair(self, center):
+        #print("CROSS HAIR AT {0.x},{0.y}".format(center))
+        self.canvas.create_line(0, center.y, 1000, center.y, fill='#ff0000', width=1, dash='-..')
+        self.canvas.create_line(center.x, 0, center.x, 1000, fill='#ff0000', width=1, dash='-..')
 
-    def _render_map_element_list(self, dc, context, element_list, is_current_location=False):
+    def _render_map_element_list(self, context, element_list, is_current_location=False):
         for drawing_object in element_list:
             try:
                 drawing_code = drawing_object[0][0]
-                if drawing_code in self.DrawingElementDispatchTable:
-                    drawing_method, args_expected, include_flags = self.DrawingElementDispatchTable[drawing_code]
+                if drawing_code in self.drawing_element_dispatch_table:
+                    drawing_method, args_expected, include_flags = self.drawing_element_dispatch_table[drawing_code]
                     if len(drawing_object) != args_expected+1:
                         raise InvalidDrawingElement(
                                 '{0}: Object {1} has {2} element{3} ({4} expected)'.format(
@@ -658,14 +748,20 @@ class MapCanvas (wx.ScrolledWindow):
                                 )
                         )
                     if include_flags:
-                        drawing_method(dc, drawing_object[0][1:]+('@' if is_current_location else ''), *drawing_object[1:])
+                        drawing_method(drawing_object[0][1:]+('@' if is_current_location else ''), *drawing_object[1:])
                     else:
-                        drawing_method(dc, *drawing_object[1:])
+                        drawing_method(*drawing_object[1:])
                 else:
                     raise InvalidDrawingElement('{0}: Object {1} has unknown type "{2}"'.format(
                                 context, drawing_object, drawing_object[0]))
             except MapDataFormatError:
                 raise
             except Exception as problem:
+                traceback.print_tb(sys.exc_info()[2])
+                print("-----")
                 raise MapDataProcessingError('{0}: Error processing object {1}: {2}'.format(
                             context, drawing_object, problem))
+
+    def set_current_location(self, room_id):
+        self.current_location = room_id
+        self.refresh()

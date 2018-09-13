@@ -852,11 +852,15 @@ map:  [1 2 3 4 5 6 7 8] mazeroom
                 ['R', 5, 6, 7, 8, 'one', 'two', [['e', 9], ['w', 20]]],
                 ['R', 10, 11, 'R', 12, 'x', 'y',[['e', 9], ['w', 20]]],
              ]),
-            ('5 6 scale gsave 7 8 scale grestore', [['Z',5,6],['Z',7,8],['Z',5,6]]),
+            ('5 6 scale gsave 7 8 scale grestore', [['Z',5,6],['Z',35,48],['Z',5,6]]),
             ('gsave 7 8 scale grestore', [['Z',7,8],['Z',1,1]]),
             ('10 -20 translate', [['X',10,-20]]),
-            ('10 -20 translate gsave -1.5 6.6 translate grestore', [['X',10,-20],['X',-1.5,6.6],['X',10,-20]]),
+            ('10 -20 translate gsave -1.5 6.6 translate grestore', [['X',10,-20],['X',8.5,-13.4],['X',10,-20]]),
             ('gsave -1.5 6.6 translate grestore', [['X',-1.5,6.6],['X',0,0]]),
+            ('3 4 scale 2 2 scale', [['Z',3,4],['Z',6,8]]),
+            ('3 4 scale gsave 2 2 scale grestore', [['Z',3,4],['Z',6,8],['Z',3,4]]),
+            ('gsave 3 4 scale gsave 2 2 scale grestore grestore', [['Z',3,4],['Z',6,8],['Z',3,4],['Z',1,1]]),
+            ('2 3 scale 20 30 translate', [['Z',2,3],['X',40,90]]),
         ))
 
     def test_bad_graphic_state(self):

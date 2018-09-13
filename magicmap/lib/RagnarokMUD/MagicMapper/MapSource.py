@@ -143,8 +143,9 @@
 
 import re, math, sys
 import os.path
-from RagnarokMUD.MagicMapper.MapRoom import MapRoom
-from RagnarokMUD.MagicMapper.MapPage import MapPage, LANDSCAPE, PORTRAIT, PageOrientationViolationError
+from RagnarokMUD.MagicMapper.BasicUnits import GraphicsState, Point, Color, GreyLevel, FontSelection
+from RagnarokMUD.MagicMapper.MapRoom    import MapRoom
+from RagnarokMUD.MagicMapper.MapPage    import MapPage, LANDSCAPE, PORTRAIT, PageOrientationViolationError
 
 DEFAULT_EXIT_LENGTH = 20    # units for exit passages (unless overridden)
 
@@ -188,8 +189,11 @@ class RoomAttributes (object):
     def __call__(self, f_self, *args):
         if f_self.room_shade is None:
             shade = ''
+        elif isinstance(f_self.room_shade, (list,tuple)):
+            shade = '#{:2X}{:2X}{:2X}'.format(
+                max(min(int(f_self.room_shade[0] * 255), 255), 0))
         else:
-            shade = '$%02d' % max(min(int(f_self.room_shade*100), 0), 99)
+            shade = '${:2d}'.format(max(min(int(f_self.room_shade*100), 99), 0))
         returnval = self.f(f_self, ''.join(sorted(f_self.room_flags)) + shade, *args)
         f_self.room_flags.clear()
         f_self.exit_flags.clear()
@@ -347,67 +351,6 @@ class RequireArgs (object):
             return f(f_self, *args)
         return wrapper
 
-class Point:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def __eq__(self, other):
-        return self.x == other.x and self.y == other.y
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-class Color:
-    def __init__(self, r, g, b):
-        self.red = r
-        self.green = g
-        self.blue = b
-
-    def __eq__(self, other):
-        return self.red == other.red and self.green == other.green and self.blue == other.blue
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-class GreyLevel (Color):
-    def __init__(self, v):
-        self.red = self.green = self.blue = v
-
-class FontSelection:
-    def __init__(self, name, size):
-        self.name = name
-        self.size = size
-
-    def __eq__(self, other):
-        return self.name == other.name and self.size == other.size
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-class GraphicsState:
-    def __init__(self, clone_from=None):
-        if clone_from is None:
-            self.color = GreyLevel(0)
-            self.translate = Point(0,0)
-            self.scale = Point(1,1)
-            self.font = FontSelection('Ft', 8)
-            self.line_width = 1
-        else:
-            self.clone(clone_from)
-
-    def clone(self, other_state):
-        self.color = other_state.color
-        self.translate = other_state.translate
-        self.scale = other_state.scale
-        self.font = other_state.font
-        self.line_width = other_state.line_width
-
-    def __eq__(self, other):
-        return self.color == other.color and self.translate == other.translate and self.scale == other.scale and self.font == other.font and self.line_width == other.line_width
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
 class MapSource (object):
     '''The Ragnarok Magic Map as described in RRFC42 and RRFC46.
@@ -865,6 +808,8 @@ class MapSource (object):
                         raise MapFileFormatError('Exit declared to be going multiple directions!')
                 else:
                     self.exit_direction = ps_exit_directions[ps_token]
+            elif ps_token == 'rgbshaded':
+                self._ps_rgbshaded()
             elif ps_token == 'shaded':
                 self._ps_shaded()
             elif ps_token == 'passageLength' or ps_token == 'passagelength':
@@ -1020,14 +965,16 @@ class MapSource (object):
                     object.append(['X', current.translate.x, current.translate.y])
 
             elif ps_token == 'scale':
-                Sy = self.stack.pop()
-                Sx = self.stack.pop()
+                Sy = self.stack.pop() * self.graphics_state[-1].scale.y
+                Sx = self.stack.pop() * self.graphics_state[-1].scale.x
                 self.graphics_state[-1].scale = Point(Sx, Sy)
                 object.append(['Z', Sx, Sy])
 
             elif ps_token == 'translate':
-                Dy = self.stack.pop()
-                Dx = self.stack.pop()
+                Dy = self.stack.pop() * self.graphics_state[-1].scale.y \
+                                      + self.graphics_state[-1].translate.y
+                Dx = self.stack.pop() * self.graphics_state[-1].scale.x \
+                                      + self.graphics_state[-1].translate.x
                 self.graphics_state[-1].translate = Point(Dx, Dy)
                 object.append(['X', Dx, Dy])
 
@@ -1590,6 +1537,13 @@ class MapSource (object):
     @RequireArgs('shaded', 'k')
     def _ps_shaded(self):
         self.room_shade = self.stack.pop()
+
+    @RequireArgs('rgbshaded', 'kkk')
+    def _ps_rgbshaded(self):
+        b = self.stack.pop()
+        g = self.stack.pop()
+        r = self.stack.pop()
+        self.room_shade = (r,g,b)
 
     @RequireArgs('room', 'ssccdd')
     @RoomAttributes

@@ -43,8 +43,8 @@ sys.path.append(os.path.join('..','lib'))
 from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
 config = ConfigurationManager()
 
-#from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
-#from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
+from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
+from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
 
 op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.1')
 if platform.system() == 'Windows':
@@ -74,59 +74,46 @@ Error messages about your map pages will show up here as well.  Eventually
 they will be put in a GUI window for you.
 """)
 
+icon = None
+
 class MapPreviewApp (tk.Tk):
     def __init__(self, *args, **kwargs):
+        global icon
+
         tk.Tk.__init__(self, *args, **kwargs)
-        self.iconbitmap(bitmap=os.path.join(config.image_path,'mapper.ico'))
-#XXX WINDOWS                        default=os.path.join(config.image_path,'mapper.ico'))
-        self.wm_title('Ragnarok MagicMap Preview')
 
-        frame = tk.Frame(self)
-        frame.pack()
 
-#    def OnInit(self):
-#        display_splash_screen('viewmaplogo.png')
-#        frame = MapPreviewFrame(title="Magic Map Preview", config=config, prog_name="viewmap",
-#            expand_globs = opt.expand_globs,
-#            recursive = opt.recursive,
-#            pattern = opt.pattern,
-#            ignore_errors = opt.ignore_errors,
-#            verbose = opt.verbose,
-#            file_list = cmd_map_file_list,
-#            image_dir = opt.image_dir,
-#            about_text = '''
-#This application allows wizards to preview what their maps will look like by loading the raw "source" form of the map pages into this viewer.
-#
-#Run with the --help option for more details, or see the documentation online.  (Link below)''',
-#            help_text = '''The official documentation for this program can be found
-#online at the following URL:
-#
-#http://www.rag.com/tech/tools/viewmap
-#
-#A brief synopsis of viewmap's usage may be displayed by
-#running it with the --help option.''')
-#        frame.Show()
-#        self.SetTopWindow(frame)
-#        return True
-#
-##    def OnExit(self):
-#
+        w = MapPreviewFrame(master=self, title="Ragnarok Map Preview", config=config, prog_name="viewmap",
+            expand_globs = opt.expand_globs,
+            recursive = opt.recursive,
+            pattern = opt.pattern,
+            ignore_errors = opt.ignore_errors,
+            verbose = opt.verbose or 0,
+            file_list = cmd_map_file_list,
+            image_dir = opt.image_dir,
+            about_text = '''
+This application allows wizards to preview what their maps will look like by loading the raw "source" form of the map pages into this viewer.
+
+Run with the --help option for more details, or see the documentation online.  (Link below)''',
+            help_text = '''The official documentation for this program can be found
+online at the following URL:
+
+http://www.rag.com/tech/tools/viewmap
+
+A brief synopsis of viewmap's usage may be displayed by
+running it with the --help option.''')
+        w.pack(fill=tk.BOTH, expand=True)
+        display_splash_screen(self, 'viewmaplogo.gif')
+
+        if sys.platform != 'win32':
+            icon = tk.PhotoImage(file=os.path.join(config.image_path,'mapper.gif'))
+            self.call('wm', 'iconphoto', self, icon)
+        else:
+            try:
+                self.iconbitmap(bitmap=os.path.join(config.image_path,'mapper.ico'),
+                             default=os.path.join(config.image_path,'mapper.ico'))
+            except Exception:
+                pass
 
 Application = MapPreviewApp()
 Application.mainloop()
-##@@BEGIN-DEV:
-##
-## Style notes:
-##  1. import wx (not * or wxPython.wx stuff)
-##  2. constructors should use kw args
-##  3. Don't use IDs; wx.ID_ANY if needed
-##     But use standard IDs like wx.ID_EXIT
-##  4. Use Bind() for events
-##  5. sizers, not absolute positions
-##  6. wx.App, not wx.PySimpleApp
-##  7. separate classes, not nested panels in one
-##  8. native preferred over wx: size=(500,400) not size=wx.Size(500,400)
-##  9. docstrings
-## 10. StdDialogButtonSizer adapts to platform look and feel
-## 
-##:END-DEV@@
