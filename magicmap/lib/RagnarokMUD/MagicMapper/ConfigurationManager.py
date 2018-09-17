@@ -54,7 +54,7 @@ class ConfigurationManager (configparser.SafeConfigParser):
                     'canvas_left_margin':   '30',
                     'canvas_top_margin':    '50',
                     'font_magnification':   '0.85',
-                    'logo_image':           os.path.join(my_image_path, 'RagnarokMapLogo.gif'),
+                    'logo_image':           os.path.join(my_image_path, 'logo_bg.gif'),
                     'background_tile':      os.path.join(my_image_path, 'parchment.gif'),
                     'page_number_font':     'r',
                     'page_number_size':     '32',

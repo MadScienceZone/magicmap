@@ -463,8 +463,21 @@ class MapSource (object):
         # Base map forms (everything else):
         #   /room/foo                   -> room/foo
         #    
-        # XXX This will likely only work on Unix systems!
-        room_name = os.path.normpath(path.strip())
+        if os.path.sep != '/':
+            # convert from Unix path style to local OS, normalize, then convert back
+            print("converting path from {}".format(path))
+            local_path = os.path.join(*(os.path.splitdrive(path.strip())[1].split('/')))
+            print("->{}".format(local_path))
+            room_name = '/'.join(os.path.normpath(local_path).split(os.path.sep))
+            if not room_name.startswith('/'):
+                room_name = '/' + room_name
+            print("->{}".format(room_name))
+        else:
+            # our platform understands the / separators we already have
+            print("normalizing path from {}".format(path))
+            room_name = os.path.normpath(path.strip())
+            print("->{}".format(room_name))
+
         room_creator = None
         #
         # expand ~ syntax and convert to relative path from mudlib root
@@ -475,7 +488,7 @@ class MapSource (object):
             # ~<name>/...
             if not m_tilde.group(1):
                 if creator is None:
-                    raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
+                    raise InvalidRoomPath('Cannot determine creator name to expand path {0}. Please explicitly specify the creator name with --creator option or the "Manage Creator Options" dialog.'.format(room_name))
                 room_creator = creator
             else:
                 room_creator = m_tilde.group(1)
@@ -494,7 +507,7 @@ class MapSource (object):
             else:
                 # relative path in creator's realm
                 if creator is None:
-                    raise InvalidRoomPath('Cannot determine creator name to expand path {0}'.format(room_name))
+                    raise InvalidRoomPath('Cannot determine creator name to expand path {0}. Please explicitly specify the creator name with --creator option or the "Manage Creator Options" dialog.'.format(room_name))
                 room_creator = creator
                 room_name = 'players/'+room_creator+'/'+room_name
 
@@ -522,7 +535,7 @@ class MapSource (object):
 
             page = self.get_page(record['page'])
 
-            if 'bg' in record:
+            if 'bg' in record and record['bg'].strip():
                 if page.bg:
                     # XXX warn that multiple rooms contribute to this page bg
                     pass
@@ -565,7 +578,7 @@ class MapSource (object):
             self.room_page[room_name] = page.page
             page.add_room(MapRoom(room_name, page, record.get('name'), 
                 self.compile(record['map'], global_symbols=self.realm_globals[global_key])
-                    if 'map' in record else None,
+                    if ('map' in record and record['map'].strip()) else None,
                 [self._normalize_room_path(p, creator)[0] 
                     for p in [_f for _f in record.get('also','').split('\n') if _f]],
                 reference_point=record.get('ref'),

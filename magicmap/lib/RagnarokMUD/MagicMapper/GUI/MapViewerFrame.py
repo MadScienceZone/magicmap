@@ -34,6 +34,7 @@ from tkinter import ttk
 import tkinter.filedialog
 import tkinter.messagebox
 import traceback
+import re
 
 from glob    import glob
 from fnmatch import fnmatch
@@ -90,6 +91,8 @@ class MapViewerFrame (ttk.Frame):
 
         keymaps = {
             # code       MacOS, [Other]
+           'Alt+C':      (KeyBindingDef('Alt+C', '<Option-c>'),
+                          KeyBindingDef('Alt+C', '<Alt-c>')),
            'Alt+G':      (KeyBindingDef('Alt+G', '<Option-g>'),
                           KeyBindingDef('Alt+G', '<Alt-g>')),
            'Alt+R':      (KeyBindingDef('Alt+R', '<Option-r>'),
@@ -185,13 +188,18 @@ Written by Steve Willoughby, based on some original ideas by Ron Lunde.
 {}'''.format(self.about_text))
 
 class MapPreviewFrame (MapViewerFrame):
-    def __init__(self, master=None, recursive=False, expand_globs=False, pattern="*.map", ignore_errors=False, verbose=0, file_list=None, **k):
+    def __init__(self, master=None, recursive=False, expand_globs=False, pattern="*.map", ignore_errors=False, verbose=0, file_list=None, creator_name=None, enforce_creator=False, **k):
         MapViewerFrame.__init__(self, master=master, verbose=verbose, **k)
         self.recursive = recursive
+        self.creator_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+r'(\w+)')
         self.expand_globs = expand_globs
         self.file_list = file_list or []
         self.pattern = pattern
+        self.page_idx = None
         self.ignore_errors = ignore_errors
+        self._enforce_creator = tk.IntVar(master=self, value=(1 if enforce_creator else 0))
+        self._set_creator = tk.IntVar(master=self, value=(1 if creator_name else 0))
+        self._creator_name = tk.StringVar(master=self, value=creator_name or '')
         self.about_text = '''This tool is intended for game implementors (“wizards”) to test out their magic map designs during the development and maintenance of their realms within the MUD. It takes local map and image files and displays them on this map viewer, just as they will be in the production map.
 
 For more information, see https://www.rag.com/tech/tools/viewmap.'''
@@ -221,6 +229,7 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
             ('Tools', (
                 ('Show Grid',           'Alt+G',      self.toggle_grids, self.grids_active),
                 ('Location Test',       'Cmd+L',      self.test_location, None),
+                ('Manage Creator Options...', 'Alt+C', self.manage_creators, None),
             )),
             ('Help', (
                 ('Documentation...',    None,         self.help,        None),
@@ -305,7 +314,16 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
             self.update()
 
             try:
-                self.world_map.add_from_file(open(map_file))
+                if not self._set_creator.get():
+                    # determine creator from file pathname
+                    creator_m = self.creator_re.search(os.path.splitdrive(map_file)[1])
+                    room_creator = creator_m.group(1) if creator_m else None
+                    if self.verbose > 1: print("creator is {} based on pathname {}".format(room_creator, map_file))
+                else:
+                    room_creator = self._creator_name.get() or None
+                    if self.verbose > 1: print("creator is {} based on user settings".format(room_creator))
+
+                self.world_map.add_from_file(open(map_file), creator=room_creator, enforce_creator=bool(self._enforce_creator.get()))
             except (MapFileFormatError, DuplicateRoomError) as problem:
                 print("ERROR in {0}: {1}".format(map_file, problem))
                 if not self.ignore_errors:
@@ -327,9 +345,13 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
         if self.world_map.pages:
             self.page_list = sorted(self.world_map.pages)
             self._set_page_idx(0)
-            self.set_status_text("Loaded Page{1} {0}".format(
-                ', '.join([str(s) for s in sorted(self.world_map.pages)]),
-                ('' if len(self.world_map.pages) == 1 else 's')))
+            if len(self.world_map.pages) > 10:
+                self.set_status_text("Loaded pages {0}, (+{1} more)".format(
+                    ', '.join([str(s) for s in sorted(self.world_map.pages)][:10]), len(self.world_map.pages)-10))
+            else:
+                self.set_status_text("Loaded Page{1} {0}".format(
+                    ', '.join([str(s) for s in sorted(self.world_map.pages)]),
+                    ('' if len(self.world_map.pages) == 1 else 's')))
         else:
             self.set_status_text("No pages loaded.")
             self.page_list = []
@@ -342,9 +364,14 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
             self.set_status_text("Displaying Page {0}.".format(page_no))
 
     @GUI_call
-    def next_page(self, *a): self._set_page_idx((self.page_idx + 1) % len(self.page_list))
+    def next_page(self, *a): 
+        if self.page_idx is not None:
+            self._set_page_idx((self.page_idx + 1) % len(self.page_list))
+
     @GUI_call
-    def prev_page(self, *a): self._set_page_idx((self.page_idx - 1) % len(self.page_list))
+    def prev_page(self, *a): 
+        if self.page_idx is not None:
+            self._set_page_idx((self.page_idx - 1) % len(self.page_list))
 
     @GUI_call
     def zoom_100(self, *a): self._not_yet()
@@ -369,6 +396,51 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
         else:
             self.canvas.set_current_location(None)
             self.set_status_text("Done.")
+
+    @GUI_call
+    def manage_creators(self, *a):
+        "Allow user to set creator settings"
+
+        #  _______________________________________________
+        # |  _                                            |
+        # | (_) Set all creators to __________________    |
+        # | (_) Deduce creator from directory structure   |
+        # |  _                                            |
+        # | [_] Enforce creator boundaries                |
+        # |                              ________   ____  |
+        # |                             |_Cancel_| |_OK_| |
+        # |_______________________________________________|
+        #
+
+        dialog = tk.Toplevel(self)
+        dialog.title('Manage Creator Options')
+        dialog.transient(self)
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(0, weight=1)
+        dialog.resizable(False,False)
+
+        f = ttk.Frame(dialog)
+        f.grid(sticky=tk.N+tk.S+tk.E+tk.W)
+        f.columnconfigure(0, weight=1)
+        f.rowconfigure(0, weight=1)
+
+        ttk.Radiobutton(f, text='Set all creators to:', variable=self._set_creator, value=1, command=self._flip_creator).grid(
+            column=0, row=0, sticky=tk.W, padx=3, pady=2)
+        self._creator_w = ttk.Entry(f, textvariable=self._creator_name)
+        self._creator_w.grid(column=1, row=0, sticky=tk.W, padx=3, pady=2)
+
+        ttk.Radiobutton(f, text='Deduce creator from directory structure.', variable=self._set_creator, value=0, command=self._flip_creator).grid(
+            column=0, row=1, columnspan=2, sticky=tk.W, padx=3, pady=2)
+            
+        ttk.Checkbutton(f, text='Enforce creator boundaries', variable=self._enforce_creator).grid(
+            column=0, row=2, columnspan=2, sticky=tk.W, padx=3, pady=8)
+        ttk.Button(f, text='OK', command=dialog.destroy).grid(
+            column=1, row=3, sticky=tk.E, padx=3, pady=10)
+        self._flip_creator()
+
+    def _flip_creator(self, *a):
+        self._creator_w.state(['!disabled'] if self._set_creator.get() else ['disabled'])
+        
 
 #class MapClientFrame (MapViewerFrame):
 #    def __init__(self, **k):

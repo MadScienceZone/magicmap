@@ -46,12 +46,14 @@ config = ConfigurationManager()
 from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
 from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
 
-op = optparse.OptionParser(usage='%prog [-ghIrv] [-i imgdir] [-p pattern] mapfiles...', version='6.1')
+op = optparse.OptionParser(usage='%prog [-bghIrv] [-C creator] [-i imgdir] [-p pattern] mapfiles...', version='6.1')
 if platform.system() == 'Windows':
     op.set_defaults(expand_globs=True, pattern='*.map')
 else:
     op.set_defaults(pattern='*.map')
 
+op.add_option('-b', '--enforce-boundaries', action='store_true', help='Enforce creator/realm boundaries')
+op.add_option('-C', '--creator',      help='Specify realm creator name (rather than deducing it from pathnames)')
 op.add_option('-g', '--expand-globs', action='store_true', help='Expand wildcard patterns in filename list [%default]')
 op.add_option('-I', '--ignore-errors',action='store_true', help='Keep trying to finish even if some errors were found')
 op.add_option('-i', '--image-dir',    metavar='DIR',       help='Top-level embedded image directory')
@@ -90,6 +92,8 @@ class MapPreviewApp (tk.Tk):
             ignore_errors = opt.ignore_errors,
             verbose = opt.verbose or 0,
             file_list = cmd_map_file_list,
+            creator_name = opt.creator,
+            enforce_creator = bool(opt.enforce_boundaries),
             image_dir = opt.image_dir,
             about_text = '''
 This application allows wizards to preview what their maps will look like by loading the raw "source" form of the map pages into this viewer.

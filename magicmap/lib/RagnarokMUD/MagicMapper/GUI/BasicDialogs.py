@@ -48,7 +48,8 @@ def display_splash_screen(main_window, image_file_name):
     tk.Label(w, image=splash_images[image_file_name]).pack(side=tk.TOP, fill=tk.BOTH, expand=True)
     w.lift()
     main_window.withdraw()
-    w.update()
+    w.update_idletasks()
+    w.overrideredirect(True)
     w.after(3000, (lambda: dismiss_splash_screen(main_window, w)))
 
 def dismiss_splash_screen(main_window, splash_window):

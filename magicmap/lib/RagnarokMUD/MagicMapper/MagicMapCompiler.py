@@ -84,7 +84,7 @@ def make_world(source_trees, dest_tree, creator_from_path=False, ignore_errors=F
             # and the base "realm.map" (anywhere outside player files)
             creator_name = None
             if creator_from_path:
-                creator_m = creator_re.search(root)
+                creator_m = creator_re.search(os.path.splitdrive(root)[1])
                 if creator_m:
                     creator_name = creator_m.group(1)
                     if rootdir_re.search(root):

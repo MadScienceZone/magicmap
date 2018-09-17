@@ -440,12 +440,12 @@ class MapCanvas (ScrolledCanvas):
             if not use_tilting:
                 tilted = False
             
+            start_point = center + V
             if corridor_length > 0:
                 # draw line from center+V to the point length*L from there in x and y directions
                 #print("corridor length {0} from center ({1.x},{1.y}) + vector ({2.x},{2.y}) code {3}".format(
                 #    corridor_length, center, V, direction_code
                 #))
-                start_point = center + V
                 L.scale(corridor_length)
                 end_point = extended(center + V2, L, direction_code)
 
@@ -734,6 +734,9 @@ class MapCanvas (ScrolledCanvas):
         self.canvas.create_line(center.x, 0, center.x, 1000, fill='#ff0000', width=1, dash='-..')
 
     def _render_map_element_list(self, context, element_list, is_current_location=False):
+        if element_list is None:
+            return
+
         for drawing_object in element_list:
             try:
                 drawing_code = drawing_object[0][0]
