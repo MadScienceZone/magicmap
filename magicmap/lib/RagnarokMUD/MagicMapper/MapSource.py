@@ -1596,7 +1596,6 @@ class MapSource (object):
     def _ps_setdash(self):
         return ['D']+list(reversed([self.stack.pop() for i in range(2)]))
 
-
     @RequireArgs('shadebox', 'ccddk')
     def _ps_shadebox(self):
         color = self.stack.pop()
@@ -1637,7 +1636,6 @@ class MapSource (object):
 
     @RequireArgs('fittext-sw', 'sdd')
     def _ps_fittext_sw(self): return self._ps_fittext('d')
-
 
     @RequireArgs('show', 's')
     def _ps_show_text(self):

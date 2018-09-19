@@ -420,15 +420,26 @@ class MapCanvas (ScrolledCanvas):
         # titles
         #
         self.set_map_color(GreyLevel(0))
-        self.set_map_font(FontSelection('t',8))
+        self.set_map_font(FontSelection('t',12))
         cx = x + w/2
         cy = y + h/2
         if t2:
-            self._draw_map_text(cx, cy + max(4, h/8), t1, center_on_xy=True)
-            self._draw_map_text(cx, cy - max(4, h/8), t2, center_on_xy=True)
+            #self._draw_map_text(cx, cy + max(4, h/8), t1, center_on_xy=True)
+            #self._draw_map_text(cx, cy - max(4, h/8), t2, center_on_xy=True)
+            if any(['D' in x[0] for x in exits]):
+                self._fit_map_text('m', x+4,  cy, w-8, h/2-4, t1)
+                self._fit_map_text('m', x+4, y+4, w-8, h/2-4, t2)
+            else:
+                self._fit_map_text('m', x+.5,cy+.5, w-1, h/2-1, t1)
+                self._fit_map_text('m', x+.5, y+.5, w-1, h/2-1, t2)
         else:
-            self._draw_map_text(cx, cy, t1, center_on_xy=True)
+            #self._draw_map_text(cx, cy, t1, center_on_xy=True)
+            if any(['D' in x[0] for x in exits]):
+                self._fit_map_text('m', x+4, y+4, w-8, h-8, t1)
+            else:
+                self._fit_map_text('m', x+.5, y+.5, w-1, h-1, t1)
 
+        self.set_map_font(FontSelection('t',8))
         self._handle_exits(exits, Point(cx, cy), Point(w/2, h/2), Point(w/2, h/2),
             (line_color, line_width, fill_color, dash_pattern))
 
@@ -524,6 +535,7 @@ class MapCanvas (ScrolledCanvas):
 
         p1 = self._pos_map2tk(Point(x-radius, y+radius))
         p2 = self._pos_map2tk(Point(x+radius, y-radius))
+        cp = self._pos_map2tk(Point(x,y))
 
         opts = {
             'fill': fill_color.rgb,
@@ -540,13 +552,24 @@ class MapCanvas (ScrolledCanvas):
         # titles
         #
         self.set_map_color(GreyLevel(0))
-        self.set_map_font(FontSelection('t',8))
+        self.set_map_font(FontSelection('t',12))
         if t2:
-            self._draw_map_text(x, y + max(4, radius/6), t1, center_on_xy=True)
-            self._draw_map_text(x, y - max(4, radius/6), t2, center_on_xy=True)
+            #self._draw_map_text(x, y + max(4, radius/6), t1, center_on_xy=True)
+            #self._draw_map_text(x, y - max(4, radius/6), t2, center_on_xy=True)
+            if any(['D' in x[0] for x in exits]):
+                self._fit_map_text('s', x-radius+4, y, radius*2-8, 0, t1)
+                self._fit_map_text('n', x-radius+4, y, radius*2-8, 0, t2)
+            else:
+                self._fit_map_text('s', x-radius+1, y, radius*2-2, 0, t1)
+                self._fit_map_text('n', x-radius+1, y, radius*2-2, 0, t2)
         else:
-            self._draw_map_text(x, y, t1, center_on_xy=True)
+            #self._draw_map_text(x, y, t1, center_on_xy=True)
+            if any(['D' in x[0] for x in exits]):
+                self._fit_map_text('m', x-radius+4, y, radius*2-8, 0, t1)
+            else:
+                self._fit_map_text('m', x-radius+1, y, radius*2-2, 0, t1)
 
+        self.set_map_font(FontSelection('t',8))
         self._handle_exits(exits, Point(x, y), Point(radius, radius), Point(radius*.7071, radius*.7071), 
             (line_color, line_width, fill_color, dash_pattern), True)
 
@@ -603,8 +626,8 @@ class MapCanvas (ScrolledCanvas):
         font_size = self.current_font_size
         while font_size > 1:
             bbox = self.canvas.bbox(t_id)
-            if not ((size.x > 0 and bbox[2]-bbox[0] > size.x) 
-                 or (size.y > 0 and bbox[3]-bbox[1] > size.y)):
+            if not ((size.x > 0 and bbox[2]-bbox[0] > self._width(size.x)) 
+                 or (size.y > 0 and bbox[3]-bbox[1] > self._width(size.y))):
                 break
 
             font_size -= 1
