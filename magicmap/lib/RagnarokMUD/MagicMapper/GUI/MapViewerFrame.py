@@ -194,6 +194,8 @@ class MapPreviewFrame (MapViewerFrame):
         self.creator_re = re.compile(re.escape(os.path.sep)+'players'+re.escape(os.path.sep)+r'(\w+)')
         self.expand_globs = expand_globs
         self.file_list = file_list or []
+        self.zoom_idx = 0
+        self.zoom_factors = (1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0)
         self.pattern = pattern
         self.page_idx = None
         self.ignore_errors = ignore_errors
@@ -374,11 +376,26 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
             self._set_page_idx((self.page_idx - 1) % len(self.page_list))
 
     @GUI_call
-    def zoom_100(self, *a): self._not_yet()
+    def zoom_100(self, *a): 
+        self.zoom_idx = 0
+        self.canvas.set_zoom(self.zoom_factors[self.zoom_idx])
+        self.refresh()
+        self.set_status_text("Zoom set to 100%")
+
     @GUI_call
-    def zoom_in(self, *a): self._not_yet()
+    def zoom_in(self, *a):
+        self.zoom_idx = min(self.zoom_idx + 1, len(self.zoom_factors)-1)
+        self.canvas.set_zoom(self.zoom_factors[self.zoom_idx])
+        self.refresh()
+        self.set_status_text("Zoom set to {:d}%".format(int(self.zoom_factors[self.zoom_idx]*100)))
+
     @GUI_call
-    def zoom_out(self, *a): self._not_yet()
+    def zoom_out(self, *a):
+        self.zoom_idx = max(0, self.zoom_idx - 1)
+        self.canvas.set_zoom(self.zoom_factors[self.zoom_idx])
+        self.refresh()
+        self.set_status_text("Zoom set to {:d}%".format(int(self.zoom_factors[self.zoom_idx]*100)))
+
     @GUI_call
     def edit_preferences(self, *a): self._not_yet()
 

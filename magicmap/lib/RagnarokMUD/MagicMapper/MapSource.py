@@ -236,12 +236,12 @@ class RequireArgs (object):
 
     The prototype values are:
       'b' boolean value (int for now)
-      'c' coordinate value (int/float in range 0 <= x <= 700)
+      'c' coordinate value (int/float)
       'd' dimension value (int/float in range 0 <= x <= 700)
       'f' float value (float or something able to be coerced into one)
       'i' int value (integer or something able to be coerced into one)
       'k' color value (float in range 0 <= x <= 1)
-      'o' offset value (int/float in range -700 <= x <= 700)
+      'o' offset value (int/float)
       'p' array of coordinate pairs (list/tuple of even number of 'c' values)
       's' string value (string object)
       'x' executable block of code (list of tokens to be re-scanned by compiler)
@@ -275,25 +275,28 @@ class RequireArgs (object):
                         if not isinstance(check[1], (float, int)):
                             raise MapFileFormatError('map definition command "%s", parameter #%d, coordinate value expected (got "%s")' %
                                     (self.f_name, idx+1, check[1]))
-                        if not 0 <= check[1] <= 700:
-                            raise ValueError('map definition command "%s", parameter #%d, coordinate value %f out of valid range [0,700]' %
-                                    (self.f_name, idx+1, check[1]))
+                        # Since we now allow scale and translate, this range check no longer makes sense.
+                        #if not 0 <= check[1] <= 700:
+                        #    raise ValueError('map definition command "%s", parameter #%d, coordinate value %f out of valid range [0,700]' %
+                        #            (self.f_name, idx+1, check[1]))
 
                     elif check[0] == 'd': #dimension value
                         if not isinstance(check[1], (float, int)):
                             raise MapFileFormatError('map definition command "%s", parameter #%d, dimension value expected (got "%s")' %
                                     (self.f_name, idx+1, check[1]))
-                        if not 0 <= check[1] <= 700:
-                            raise ValueError('map definition command "%s", parameter #%d, dimension value %f out of valid range [0,700]' %
-                                    (self.f_name, idx+1, check[1]))
+                        # Since we now allow scale and translate, this range check no longer makes sense.
+                        #if not 0 <= check[1] <= 700:
+                        #    raise ValueError('map definition command "%s", parameter #%d, dimension value %f out of valid range [0,700]' %
+                        #            (self.f_name, idx+1, check[1]))
 
                     elif check[0] == 'o': #offset value
                         if not isinstance(check[1], (float, int)):
                             raise MapFileFormatError('map definition command "%s", parameter #%d, offset value expected (got "%s")' %
                                     (self.f_name, idx+1, check[1]))
-                        if not -700 <= check[1] <= 700:
-                            raise ValueError('map definition command "%s", parameter #%d, offset value %f out of valid range [-700,700]' %
-                                    (self.f_name, idx+1, check[1]))
+                        # Since we now allow scale and translate, this range check no longer makes sense.
+                        #if not -700 <= check[1] <= 700:
+                        #    raise ValueError('map definition command "%s", parameter #%d, offset value %f out of valid range [-700,700]' %
+                        #            (self.f_name, idx+1, check[1]))
 
                     elif check[0] == 'k': #color value (0-1)
                         if not isinstance(check[1], (float, int)):
@@ -310,9 +313,10 @@ class RequireArgs (object):
                         if len(check[1]) % 2 != 0:
                             raise MapFileFormatError('map definition command "%s", parameter #%d, coordinate-pair-list value "%s" has odd number of elements)' %
                                     (self.f_name, idx+1, check[1]))
-                        if not all([0 <= i <= 700 for i in check[1]]):
-                            raise ValueError('map definition command "%s", parameter #%d, coordinate(s) in list out of range [0,700]: %s' %
-                                    (self.f_name, idx+1, check[1]))
+                        # Since we now allow scale and translate, this range check no longer makes sense.
+                        #if not all([0 <= i <= 700 for i in check[1]]):
+                        #   raise ValueError('map definition command "%s", parameter #%d, coordinate(s) in list out of range [0,700]: %s' %
+                        #           (self.f_name, idx+1, check[1]))
 
                     elif check[0] == 'x': #executable block
                         if not isinstance(check[1], (list,tuple)):
@@ -692,6 +696,16 @@ class MapSource (object):
             'color':    self._ps_color,
             'colorbox': self._ps_colorbox,
             'dotmark':  self._ps_dotmark,
+            'fittext':  self._ps_fittext,
+            'fittext-c': self._ps_fittext_c,
+            'fittext-n': self._ps_fittext_n,
+            'fittext-s': self._ps_fittext_s,
+            'fittext-e': self._ps_fittext_e,
+            'fittext-w': self._ps_fittext_w,
+            'fittext-ne': self._ps_fittext_ne,
+            'fittext-nw': self._ps_fittext_nw,
+            'fittext-se': self._ps_fittext_se,
+            'fittext-sw': self._ps_fittext_sw,
             'graphic':  self._ps_image,
             'gr':       self._ps_gr,
             'it':       self._ps_it,
@@ -1587,6 +1601,43 @@ class MapSource (object):
     def _ps_shadebox(self):
         color = self.stack.pop()
         return ['A']+list(reversed([self.stack.pop() for i in range(4)]))+[color]*3
+
+    @RequireArgs('fittext', 'sdd')
+    def _ps_fittext(self, flags=''): 
+        if self.current_point is None:
+            raise MapFileFormatError('fittext: no current point defined (missing a "mv" perhaps?)')
+        height = self.stack.pop()
+        width = self.stack.pop()
+        string = self.stack.pop()
+        return ['J'+flags, self.current_point[0], self.current_point[1], width, height, string]
+
+    @RequireArgs('fittext-c', 'sdd')
+    def _ps_fittext_c(self): return self._ps_fittext('m')
+
+    @RequireArgs('fittext-n', 'sdd')
+    def _ps_fittext_n(self): return self._ps_fittext('n')
+
+    @RequireArgs('fittext-s', 'sdd')
+    def _ps_fittext_s(self): return self._ps_fittext('s')
+
+    @RequireArgs('fittext-e', 'sdd')
+    def _ps_fittext_e(self): return self._ps_fittext('e')
+
+    @RequireArgs('fittext-w', 'sdd')
+    def _ps_fittext_w(self): return self._ps_fittext('w')
+
+    @RequireArgs('fittext-ne', 'sdd')
+    def _ps_fittext_ne(self): return self._ps_fittext('a')
+
+    @RequireArgs('fittext-nw', 'sdd')
+    def _ps_fittext_nw(self): return self._ps_fittext('c')
+
+    @RequireArgs('fittext-se', 'sdd')
+    def _ps_fittext_se(self): return self._ps_fittext('b')
+
+    @RequireArgs('fittext-sw', 'sdd')
+    def _ps_fittext_sw(self): return self._ps_fittext('d')
+
 
     @RequireArgs('show', 's')
     def _ps_show_text(self):

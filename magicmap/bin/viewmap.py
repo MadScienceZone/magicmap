@@ -42,6 +42,7 @@ sys.path.append(os.path.join('..','lib'))
 
 from RagnarokMUD.MagicMapper.ConfigurationManager import ConfigurationManager
 config = ConfigurationManager()
+config.save_first()
 
 from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
 from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame

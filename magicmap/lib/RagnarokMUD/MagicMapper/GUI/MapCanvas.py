@@ -32,8 +32,8 @@ import re
 import traceback
 
 import tkinter as tk
-from tkinter import font
-from tkinter import ttk
+from   tkinter import font
+from   tkinter import ttk
 import math
 import itertools
 import RagnarokMUD.MagicMapper.MapPage
@@ -54,24 +54,34 @@ class MapDataProcessingError (Exception):
     "Problem encountered trying to handle a location."
 
 class FontDetail:
-    def __init__(self, family, size, weight, slant):
+    def __init__(self, family, size, weight, slant, zoom):
         self.family = family
         self.size = size
         self.weight = weight
         self.slant = slant
         self.object = None
+        self.zoom = zoom
+        if size:
+            self.setfont(size, zoom)
 
-        if self.size:
-            self.object = font.Font(family=family, size=size, weight=weight, slant=slant)
+    def setfont(self, size, zoom):
+        self.size = size
+        self.zoom = zoom
+        self.object = font.Font(family=self.family, size=-(int(self.size * self.zoom)), weight=self.weight, slant=self.slant)
+
+    def copy(self):
+        return FontDetail(self.family, self.size, self.weight, self.slant, self.zoom)
 
 class MapCanvas (ScrolledCanvas):
-    def __init__(self, master, scrollregion=(0, 0, 1000, 1000), page_obj=None, config=None, image_dir=None, *args, **kwargs):
+    # scroll region for 1000 units * max zoom 300%
+    def __init__(self, master, scrollregion=(0, 0, 3000, 3000), page_obj=None, config=None, image_dir=None, *args, **kwargs):
         ScrolledCanvas.__init__(self, master, scrollregion=scrollregion, *args, **kwargs)
 
         self.graph_paper_mode = False
         self._shade_pattern = re.compile(r'\$(\d\d)')
         self._color_pattern = re.compile(r'\#([0-9a-fA-F]{6})')
         self.config = config
+        self.zoom_factor = 1.0
         self.image_dir = image_dir
         self.canvas_left_margin = self.config.getfloat('rendering', 'canvas_left_margin')
         self.canvas_top_margin = self.config.getfloat('rendering', 'canvas_top_margin')
@@ -106,7 +116,7 @@ class MapCanvas (ScrolledCanvas):
             else:
                 size = None
             self.font_code_translation[code] = FontDetail(self.config.get('fonts', key+"_family"), 
-                  size, self.config.get('fonts', key+"_weight"), self.config.get('fonts', key+"_slant"))
+                  size, self.config.get('fonts', key+"_weight"), self.config.get('fonts', key+"_slant"), self.zoom_factor)
 
         N = self.config.getint('rendering', 'bezier_points')
         self.Bezier_range = [i/(N-1.0) for i in range(N)]
@@ -131,6 +141,7 @@ class MapCanvas (ScrolledCanvas):
             'D': (self._set_map_dash_pattern,   2, False),
             'F': (self._set_map_font,           1, True),
             'G': (self.draw_map_bitmap,         5, False),
+            'J': (self._fit_map_text,           5, True),
             'L': (self._set_line_width,         1, False),
             'M': (self.draw_map_maze_corridors, 1, True),
             'N': (self.draw_map_number_box,     3, False),
@@ -146,6 +157,9 @@ class MapCanvas (ScrolledCanvas):
         }
         self.refresh()
 
+    def set_zoom(self, z):
+        self.zoom_factor = z
+
     def _reset_defaults(self):
         self.landscape = False
         self.set_map_color(GreyLevel(0))
@@ -160,6 +174,13 @@ class MapCanvas (ScrolledCanvas):
         if new_page_obj != self.page_obj:
             self.page_obj = new_page_obj
             self.refresh()
+
+    def _width(self, width):
+        return int(width * self.zoom_factor)
+
+    def _dash(self, a):
+        if a is None: return None
+        return [self._width(i) for i in a]
 
     def _pos_map2tk(self, point, absolute=False):
         "Convert magic map point to canvas coordinates"
@@ -178,18 +199,19 @@ class MapCanvas (ScrolledCanvas):
         #        point.y, self.current_scale.y, self.current_translation.y, self.canvas_top_margin,
         #    new_point.y)
         #)
+        new_point.scale(self.zoom_factor)
         return new_point
 
     def draw_graph_paper(self):
         for width, skip in ((1,5), (2,30)):
             for x in range(30, (700 if self.landscape else 580)+1, skip):
-                self.canvas.create_line(x+self.canvas_left_margin, 30+self.canvas_top_margin,
-                    x+self.canvas_left_margin, (580 if self.landscape else 700)+self.canvas_top_margin,
-                    fill='#1e90ff', width=width)
+                p1 = self._pos_map2tk(Point(x, 30))
+                p2 = self._pos_map2tk(Point(x, (580 if self.landscape else 700)))
+                self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, fill='#1e90ff', width=width)
             for y in range((580 if self.landscape else 700), 30-1, -skip):
-                self.canvas.create_line(30+self.canvas_left_margin, y+self.canvas_top_margin,
-                    (700 if self.landscape else 580)+self.canvas_left_margin, y+self.canvas_top_margin,
-                    fill='#1e90ff', width=width)
+                p1 = self._pos_map2tk(Point(30, y))
+                p2 = self._pos_map2tk(Point((700 if self.landscape else 580), y))
+                self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, fill='#1e90ff', width=width)
 
         self.set_map_font(FontSelection('t',8))
         for x in range(30, (700 if self.landscape else 580)+1, 30):
@@ -211,11 +233,11 @@ class MapCanvas (ScrolledCanvas):
         point2 = self._pos_map2tk(Point(x+w, y+h))
         if self.current_dash_pattern is not None:
             self.canvas.create_rectangle(point1.x, point1.y, point2.x, point2.y, 
-                tags=[], outline=self.current_color.rgb, width=self.current_line_width,
-                dash=self.current_dash_pattern.pattern, dashoffset=self.current_dash_pattern.offset)
+                tags=[], outline=self.current_color.rgb, width=self._width(self.current_line_width),
+                dash=self._dash(self.current_dash_pattern.pattern), dashoffset=self._width(self.current_dash_pattern.offset))
         else:
             self.canvas.create_rectangle(point1.x, point1.y, point2.x, point2.y, 
-                tags=[], outline=self.current_color.rgb, width=self.current_line_width)
+                tags=[], outline=self.current_color.rgb, width=self._width(self.current_line_width))
             
     def draw_map_bitmap(self, x, y, w, h, image_id):
         "[G, x, y, w, h, id] -> draw image at (x,y) scaled to (w,h)"
@@ -288,11 +310,11 @@ class MapCanvas (ScrolledCanvas):
                 splinesteps=self.spline_points, width=0)
         if 'w' in flags:
             if dash_pattern is None:
-                self.canvas.create_line(*points, fill=line_color.rgb, width=line_width, 
+                self.canvas.create_line(*points, fill=line_color.rgb, width=self._width(line_width),
                     smooth=1 if 'c' in flags else 0, splinesteps=self.spline_points)
             else:
-                self.canvas.create_line(*points, dash=dash_pattern.pattern, 
-                    dashoffset=dash_pattern.offset, fill=line_color.rgb, width=line_width, 
+                self.canvas.create_line(*points, dash=self._dash(dash_pattern.pattern), 
+                    dashoffset=self._width(dash_pattern.offset), fill=line_color.rgb, width=self._width(line_width),
                     smooth=1 if 'c' in flags else 0, splinesteps=self.spline_points)
 
     def draw_map_number_box(self, x, y, text):
@@ -307,12 +329,12 @@ class MapCanvas (ScrolledCanvas):
         if self.current_dash_pattern is None:
             self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, 
                 fill=self.current_color.rgb if 'f' in flags else '',
-                outline=self.current_color.rgb, width=self.current_line_width)
+                outline=self.current_color.rgb, width=self._width(self.current_line_width))
         else:
             self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, 
-                dash=self.current_dash_pattern.pattern, dashoffset=self.current_dash_pattern.offset,
+                dash=self._dash(self.current_dash_pattern.pattern), dashoffset=self._width(self.current_dash_pattern.offset),
                 fill=self.current_color.rgb if 'f' in flags else '',
-                outline=self.current_color.rgb, width=self.current_line_width)
+                outline=self.current_color.rgb, width=self._width(self.current_line_width))
 
     def draw_map_arc(self, flags, vlist):
         "[Qflags, x, y, radius, start, end] -> draw (maybe fill) an arc"
@@ -326,14 +348,14 @@ class MapCanvas (ScrolledCanvas):
 
         opts = {
             'outline': self.current_color.rgb,
-            'width': self.current_line_width,
+            'width': self._width(self.current_line_width),
             'start': s,
             'extent': (e - s) % 360,
             'style': tk.ARC,
         }
         if self.current_dash_pattern is not None:
-            opts['dash'] = self.current_dash_pattern.pattern
-            opts['dashoffset'] = self.current_dash_pattern.offset
+            opts['dash'] = self._dash(self.current_dash_pattern.pattern)
+            opts['dashoffset'] = self._width(self.current_dash_pattern.offset)
         if 'f' in flags:
             opts['fill'] = self.current_color.rgb
             opts['style'] = tk.PIESLICE
@@ -354,7 +376,7 @@ class MapCanvas (ScrolledCanvas):
         
         opts = {
             'smooth': 0,
-            'width': self.current_line_width,
+            'width': self._width(self.current_line_width),
         }
 
         if 's' in flags:
@@ -362,14 +384,14 @@ class MapCanvas (ScrolledCanvas):
             opts['splinesteps'] = self.spline_points
 
         if self.current_dash_pattern is not None:
-            opts['dash'] = self.current_dash_pattern.pattern
-            opts['dashoffset'] = self.current_dash_pattern.offset
+            opts['dash'] = self._dash(self.current_dash_pattern.pattern)
+            opts['dashoffset'] = self._width(self.current_dash_pattern.offset)
 
         if 'f' in flags:
             self.canvas.create_polygon(*points, fill=self.current_color.rgb,
                 outline=self.current_color.rgb, **opts)
         elif 'c' in flags:
-            self.canvas.create_polygon(*points, outline=self.current_color.rgb, **opts)
+            self.canvas.create_polygon(*points, fill='', outline=self.current_color.rgb, **opts)
         else:
             self.canvas.create_line(*points, fill=self.current_color.rgb, **opts)
 
@@ -385,11 +407,11 @@ class MapCanvas (ScrolledCanvas):
         opts = {
             'fill': fill_color.rgb,
             'outline': line_color.rgb,
-            'width': line_width,
+            'width': self._width(line_width),
         }
         if dash_pattern is not None:
-            opts['dash'] = dash_pattern.pattern
-            opts['dashoffset'] = dash_pattern.offset
+            opts['dash'] = self._dash(dash_pattern.pattern)
+            opts['dashoffset'] = self._width(dash_pattern.offset)
 
         p1 = self._pos_map2tk(Point(x, y+h))
         p2 = self._pos_map2tk(Point(x+w, y))
@@ -450,7 +472,7 @@ class MapCanvas (ScrolledCanvas):
                 end_point = extended(center + V2, L, direction_code)
 
                 opts = {
-                    'width': 1,
+                    'width': self._width(1),
                     'fill': line_color.rgb,
                 }
                 if 'i' in direction_code:
@@ -462,7 +484,7 @@ class MapCanvas (ScrolledCanvas):
                     opts['arrow'] = tk.LAST
 
                 if '!' in direction_code:
-                    opts['dash'] = [4,2]
+                    opts['dash'] = self._dash([4,2])
                     opts['dashoffset'] = 0
 
                 p1 = self._pos_map2tk(start_point)
@@ -489,13 +511,13 @@ class MapCanvas (ScrolledCanvas):
                     p4 = self._pos_map2tk(start_point + Point(+4,-4))
                     
                 self.canvas.create_polygon(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y,
-                   fill=fill_color.rgb, outline=line_color.rgb, width=line_width)
+                   fill=fill_color.rgb, outline=line_color.rgb, width=self._width(line_width))
 
             if 'L' in direction_code:
                 p1 = self._pos_map2tk(start_point + Point(-1,+1))
                 p2 = self._pos_map2tk(start_point + Point(+1,-1))
                 self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, fill=line_color.rgb,
-                    outline=line_color.rgb, width=1)
+                    outline=line_color.rgb, width=self._width(1))
 
     def draw_map_round_room(self, flags, x, y, radius, t1, t2, exits):
         line_color, line_width, fill_color, dash_pattern = self._color_from_flags(flags)
@@ -506,11 +528,11 @@ class MapCanvas (ScrolledCanvas):
         opts = {
             'fill': fill_color.rgb,
             'outline': line_color.rgb,
-            'width': line_width,
+            'width': self._width(line_width),
         }
         if dash_pattern is not None:
-            opts['dash'] = dash_pattern.pattern
-            opts['dashoffset'] = dash_pattern.offset
+            opts['dash'] = self._dash(dash_pattern.pattern)
+            opts['dashoffset'] = self._width(dash_pattern.offset)
 
         self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, **opts)
 
@@ -529,6 +551,72 @@ class MapCanvas (ScrolledCanvas):
             (line_color, line_width, fill_color, dash_pattern), True)
 
         
+    def _fit_map_text(self, flags, x, y, w, h, text):
+        self.fit_map_text(flags, Point(x,y), Point(w,h), text)
+
+    def fit_map_text(self, flags, point, size, text):
+        "[Jflags, x, y, w, h, text] -> text drawn in bounding box with scaling and alignment"
+        #
+        # like draw_map_text(), but scales the current font (just for this string)
+        # DOWN if necessary so that the entire text fits inside the bounding box described
+        # by point and size:
+        # 
+        # if size.x > 0:   width of text object must be <= size.x.
+        # if size.y > 0:   hieght of text object must be <= size.y.
+        #
+        # having found the right font size, place the text on the canvas in a box
+        # anchored inside it based on the flags:
+        #
+        #
+        # (point.x,point.y+size.y)              (point.x+size.x,point.y+size.y)
+        #  ___________________________________________________________________
+        # |c                                 n                               a|
+        # |                                                                   |
+        # |                                                                   |
+        # |w                                 m                               e|
+        # |                                                                   |
+        # |d_________________________________s_______________________________b|
+        # (point.x,point.y)                            (point.x+size.x,point.y)
+        #
+        the_font = self.current_font
+        adjust=0
+
+        if   'a' in flags: anchor_at=Point(point.x+size.x, point.y+size.y);    anchor=tk.NE
+        elif 'b' in flags: anchor_at=Point(point.x+size.x, point.y       );    anchor=tk.SE
+        elif 'c' in flags: anchor_at=Point(point.x       , point.y+size.y);    anchor=tk.NW
+        elif 'd' in flags: anchor_at=Point(point.x       , point.y       );    anchor=tk.SW
+        elif 'e' in flags: anchor_at=Point(point.x+size.x, point.y+size.y/2);  anchor=tk.E
+        elif 'm' in flags: anchor_at=Point(point.x+size.x/2, point.y+size.y/2);anchor=tk.CENTER
+        elif 'n' in flags: anchor_at=Point(point.x+size.x/2, point.y+size.y);  anchor=tk.N
+        elif 's' in flags: anchor_at=Point(point.x+size.x/2, point.y       );  anchor=tk.S
+        elif 'w' in flags: anchor_at=Point(point.x       , point.y+size.y/2);  anchor=tk.W
+        else:
+            # adjust for baseline too
+            anchor_at=point
+            anchor=tk.SW
+            adjust=the_font.metrics('descent')
+
+        p = self._pos_map2tk(anchor_at)
+        t_id = self.canvas.create_text(p.x, p.y+adjust, anchor=anchor, fill=self.current_color.rgb,
+            font=the_font, text=text)
+
+        font_size = self.current_font_size
+        while font_size > 1:
+            bbox = self.canvas.bbox(t_id)
+            if not ((size.x > 0 and bbox[2]-bbox[0] > size.x) 
+                 or (size.y > 0 and bbox[3]-bbox[1] > size.y)):
+                break
+
+            font_size -= 1
+            key = self.load_font(FontSelection(self.current_font_code, font_size))
+            the_font = self.font_cache[key]
+            self.canvas.itemconfigure(t_id, font=the_font)
+            if adjust > 0:
+                adjust = the_font.metrics('descent')
+                self.canvas.coords(t_id, p.x, p.y+adjust)
+        else:
+            print("** Warning: fittext: can't scale font small enough to fit text of dimensions ({0[0]},{0[1]})-({0[2]},{0[3]}) inside width {1.x} and height {1.y}".format(bbox, size))
+
     def _draw_map_text(self, x, y, text, center_on_xy=False):
         self.draw_map_text(Point(x,y), text, center_on_xy)
 
@@ -536,27 +624,103 @@ class MapCanvas (ScrolledCanvas):
         "[S, x, y, text] -> text drawn at (x,y) in current font/color"
 
         point = self._pos_map2tk(point)
-        self.canvas.create_text(point.x, point.y, anchor=tk.CENTER if center_on_xy else tk.SW,
+        self.canvas.create_text(point.x, point.y+self.current_font.metrics('descent'), 
+            anchor=tk.CENTER if center_on_xy else tk.SW,
             fill=self.current_color.rgb, font=self.current_font, text=text)
 
     def draw_map_tree(self, flags, Ox, Oy):
         "[Tflags, x, y] -> tree sort-of-at (x,y)"
 
+        o = Point(Ox, Oy)
+
         if 'c' in flags:
             if '2' in flags:
-                self._DrawMapTree(Ox-15, Oy-5, scale=.5)
-                self._DrawMapTree(Ox, Oy+12, scale=.5)
-                self._DrawMapTree(Ox+14, Oy+2, scale=.5)
+                self._tree1(o + Point(-15, -5), rotate=True)
+                self._tree1(o + Point( +0,+12), rotate=True)
+                self._tree1(o + Point(+14, +2), rotate=True)
             else:
-                self._DrawMapTree(Ox+12, Oy+12, scale=.5)
-                self._DrawMapTree(Ox, Oy+12, scale=.5)
-                self._DrawMapTree(Ox+12, Oy, scale=.5)
+                self._tree1(o + Point( 12, 12))
+                self._tree1(o + Point(  0, 12))
+                self._tree1(o + Point( 12,  0))
         elif '2' in flags:
-            self._DrawMapTree(Ox, Oy, scale=.5, alt=True)
+            self._tree1(o, rotate=True)
         else:
-            self._DrawMapTree(Ox, Oy, scale=.5)
+            self._tree1(o)
 
-    def _DrawMapTree(self, Ox, Oy, scale=3, alt=False):
+
+
+    def _tree1(self, o, scale=0.5, rotate=False):
+        # port of the old PostScript tree1 macro which draws around (0,0)
+        # we'll assume o is the point of reference that these points are all relative to.
+        #
+        # 20 22 7 350 120 arc      )
+        # 12 25 6  40 180 arc      )
+        #  6 19 4  60 210 arc      )  fill these shapes in green
+        # 12 12 8 150 270 arc      )  then stroke in black as outline
+        # 16  6 3 180  10 arc      )
+        # 23 10 5 220  60 arc      )
+        # 29 17 4 250  90 arc      )
+        # closepath
+        #
+        # 20 13 3 200 40 arc stroke
+        # 15 18 3 60 240 arc stroke
+        #
+        # tree2 draws tree1 rotated 90 degrees CCW
+        # clump1 draws a tree1 at (12,12), (0,12), and (12,0)
+        # clump2 draws a tree2 at (-15,-5), (0,12), and (14,2).
+        #
+        green = '#228b22'
+        black = '#000000'
+        polygon = []
+
+        for outline, fill in (
+            (green, green),
+            (black, ''),
+        ):
+            for center, radius, start, end, top in (
+                (Point(20,22), 7, -10, 120, False),
+                (Point(12,25), 6,  40, 187, False),
+                (Point( 6,19), 4,  60, 230, False),
+                (Point(12,12), 8, 150, 270, False),
+                (Point(16, 6), 3,-180,  10, False),
+                (Point(23,10), 5,-140,  60, False),
+                (Point(29,17), 4,-110, 100, False),
+                (Point(20,13), 3,-160,  40, True),
+                (Point(15,18), 3,  60, 240, True),
+            ):
+                if top and fill:
+                    continue
+
+                if rotate:
+                    center = Point(-center.y, center.x)
+                    start += 90
+                    end += 90
+
+                center.scale(scale)
+                radius *= scale
+
+                polygon.append(o.x + center.x + radius * math.cos(math.radians(start)))
+                polygon.append(o.y + center.y + radius * math.sin(math.radians(start)))
+                polygon.append(o.x + center.x)
+                polygon.append(o.y + center.y)
+
+                p1 = self._pos_map2tk(o + center + Point(-radius,+radius))
+                p2 = self._pos_map2tk(o + center + Point(+radius,-radius))
+                opts = {
+                    'fill': fill,
+                    'style': tk.PIESLICE if fill else tk.ARC,
+                    'outline': outline,
+                    'width': self._width(1),
+                }
+                self.canvas.create_arc(p1.x, p1.y, p2.x, p2.y, start=start, extent=end-start, **opts)
+                print("o=({},{}), center=({},{}), p1=({},{}), p2=({},{}), start={}, extent={}, opts={}".format(
+                    o.x, o.y, center.x, center.y, p1.x, p1.y, p2.x, p2.y, start, end-start, repr(opts)))
+            if fill:
+                self.canvas.create_polygon(*self._normalize_point_list(polygon), width=self._width(3), fill=fill)
+                
+
+
+    def _xxDrawMapTree(self, Ox, Oy, scale=3, alt=False):
         green = '#228b22'
         black = '#000000'
         for center, radius, start, end, outline, fill in (
@@ -589,12 +753,12 @@ class MapCanvas (ScrolledCanvas):
         sp2 = self._pos_map2tk(p2)
         if self.current_dash_pattern is None:
             self.canvas.create_line(sp1.x, sp1.y, sp2.x, sp2.y, arrow=tk.LAST, 
-                fill=self.current_color.rgb, width=self.current_line_width)
+                fill=self.current_color.rgb, width=self._width(self.current_line_width))
         else:
             self.canvas.create_line(sp1.x, sp1.y, sp2.x, sp2.y, arrow=tk.LAST, 
-                dash=self.current_dash_pattern.pattern,
-                dashoffset=self.current_dash_pattern.offset,
-                fill=self.current_color.rgb, width=self.current_line_width)
+                dash=self._dash(self.current_dash_pattern.pattern),
+                dashoffset=self._width(self.current_dash_pattern.offset),
+                fill=self.current_color.rgb, width=self._width(self.current_line_width))
 #
     def _set_map_color(self, r, g, b):  self.set_map_color(Color(r,g,b))
     def _set_map_font(self, f, size):   self.set_map_font(FontSelection(f[0], size))
@@ -604,22 +768,30 @@ class MapCanvas (ScrolledCanvas):
 
     def set_map_color(self, new_color): self.current_color = new_color
     def set_map_font(self, new_font):   
+        key = self.load_font(new_font)
+        self.current_font = self.font_cache[key]
+        self.current_font_code = new_font.name
+        self.current_font_size = new_font.size
+
+    def load_font(self, new_font):
         #
         # set_map_font(FontSelection(flag, size))
         #
         # font_code_translation[flag] = FontDetail object (size may be None)
-        # font_cache[name@size] = tk.Font object
+        # font_cache[name@size@zoom] = tk.Font object
         #
-        key = "{}@{}".format(new_font.name,new_font.size)
+        key = "{}@{}@{:.2f}".format(new_font.name,new_font.size,self.zoom_factor)
         if key not in self.font_cache:
             if new_font.name not in self.font_code_translation:
                 raise MapDataFormatError('Undefined font code {} requested'.format(new_font.name))
             fd = self.font_code_translation[new_font.name]
-            if fd.object and fd.size == new_font.size:
+            if fd.object and fd.size == new_font.size and fd.zoom == self.zoom_factor:
                 self.font_cache[key] = fd.object
             else:
-                self.font_cache[key] = font.Font(family=fd.family, size=new_font.size, slant=fd.slant, weight=fd.weight)
-        self.current_font = self.font_cache[key]
+                new_desc=fd.copy()
+                new_desc.setfont(new_font.size, self.zoom_factor)
+                self.font_cache[key] = new_desc.object
+        return key
 
     def set_translation(self, new_dxy): self.current_translation = new_dxy
     def set_scale_factor(self, new_sc): self.current_scale = new_sc
@@ -678,6 +850,8 @@ class MapCanvas (ScrolledCanvas):
             #
             # annotations
             #
+            real_zoom = self.zoom_factor
+            self.zoom_factor = 1.0
             self.set_map_font(FontSelection(self.page_number_font, self.page_number_size))
             self.set_map_color(GreyLevel(0))
             self.draw_map_text(self.page_number_location, '{{{0}}}'.format(self.page_obj.page))
@@ -689,6 +863,7 @@ class MapCanvas (ScrolledCanvas):
                 self.draw_map_text(self.page_title2_location, '[{}]'.format(', '.join(self.page_obj.creators)))
             else:
                 self.draw_map_text(self.page_title2_location, '[Base world map]')
+            self.zoom_factor = real_zoom
 
             self.landscape = self.page_obj.orient == RagnarokMUD.MagicMapper.MapPage.LANDSCAPE
             if graph_paper:
