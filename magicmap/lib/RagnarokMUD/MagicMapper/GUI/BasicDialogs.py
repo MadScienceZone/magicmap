@@ -35,11 +35,6 @@ import time
 splash_images = {}
 
 def display_splash_screen(main_window, image_file_name):
-    print("Loading", os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                'images',
-                image_file_name))
-
     w = tk.Toplevel(None)
     if image_file_name not in splash_images:
         splash_images[image_file_name] = tk.PhotoImage(file=os.path.join(

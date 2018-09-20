@@ -469,18 +469,13 @@ class MapSource (object):
         #    
         if os.path.sep != '/':
             # convert from Unix path style to local OS, normalize, then convert back
-            print("converting path from {}".format(path))
             local_path = os.path.join(*(os.path.splitdrive(path.strip())[1].split('/')))
-            print("->{}".format(local_path))
             room_name = '/'.join(os.path.normpath(local_path).split(os.path.sep))
             if not room_name.startswith('/'):
                 room_name = '/' + room_name
-            print("->{}".format(room_name))
         else:
             # our platform understands the / separators we already have
-            print("normalizing path from {}".format(path))
             room_name = os.path.normpath(path.strip())
-            print("->{}".format(room_name))
 
         room_creator = None
         #
@@ -517,7 +512,7 @@ class MapSource (object):
 
         return (room_name, room_creator)
 
-    def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None, verbosity=5):
+    def add_from_file(self, input_file, creator=None, enforce_creator=False, source_date=None, verbosity=0):
         "Add rooms and places to this file from a map source file."
         if verbosity > 2:
             sys.stdout.write("MapSource.add_from_file(creator={0}, enforce_creator={1}, source_date={2}, verbosity={3}\n".format(repr(creator), enforce_creator, repr(source_date), verbosity))
@@ -814,7 +809,6 @@ class MapSource (object):
             'closepath':'c',
         }
         for ps_token in self._each_ps_token(source):
-            #print "compile: stack={0}, token={1}".format(self.stack, ps_token)
             if isinstance(ps_token, (int, float, list, tuple)):
                 self.stack.append(ps_token)
             elif ps_token in ps_command_dispatch:
@@ -1407,7 +1401,6 @@ class MapSource (object):
         self._append_path_coords('[r]lineto', 'p', [(x,y)])
 
     def _append_path_coords(self, cmdname, dtype, pointlist, isolate=False, current=None):
-        #print "_append_path_coords: {0}, {1}, {2}, {3}".format(cmdname, dtype, pointlist, isolate)
         if self.drawing_mode_list is None:
             raise MapFileFormatError('{0} command encountered outside drawing mode (need "newpath" first)'.format(cmdname))
 
@@ -1690,10 +1683,8 @@ class MapSource (object):
 
         while self._token_input_stack:
             context = self._token_input_stack[-1][1]
-            #print "tokenizer_pop({0}): stack={1}, ctx={2}".format(out_of_loop, self._token_input_stack, context)
             self._token_input_stack.pop()
             if not out_of_loop or context is not None:
-                #print "-STOP: stack={1}, ctx={2}".format(out_of_loop, self._token_input_stack, context)
                 break
         else:
             raise MapFileFormatError('Loop termination (i.e. exit) encountered outside any active loop context.')

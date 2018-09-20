@@ -48,6 +48,9 @@ class Point:
         self.x *= factor
         self.y *= factor
 
+    def clone(self):
+        return Point(self.x, self.y)
+
 class Color:
     def __init__(self, r, g, b):
         self.red = r

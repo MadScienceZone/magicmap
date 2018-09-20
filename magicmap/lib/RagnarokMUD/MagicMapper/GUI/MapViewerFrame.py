@@ -257,11 +257,8 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
 
     @GUI_call
     def open_dirs(self, *a):
-        print("open_dirs({}, {})", self, a)
         dialog = tk.filedialog.Directory(self)
-        print("dialog {}".format(dialog))
         name = dialog.show(title="Open Magic Map Directory...")
-        print("name {}".format(name))
 
         if name:
             self.file_list = [name]

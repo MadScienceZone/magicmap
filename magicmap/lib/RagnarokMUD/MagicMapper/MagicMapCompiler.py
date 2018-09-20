@@ -155,11 +155,11 @@ def make_world(source_trees, dest_tree, creator_from_path=False, ignore_errors=F
                     continue
 
             with open(target_name, 'w') as rm:
-                print("** writing", target_name,"**")
+                #print("** writing", target_name,"**")
                 rm.write(translator.dump_room(room, public_id_filter=gen_public_room_id, gentime=compile_dtm) + '\n')
             if room.source_modified_date:
                 #match the source's timestamp
-                print("** setting time stamp **")
+                #print("** setting time stamp **")
                 os.utime(target_name, 
                         (time.time(), time.mktime(room.source_modified_date.utctimetuple())))
 
