@@ -191,15 +191,27 @@ class RoomAttributes (object):
             shade = ''
         elif isinstance(f_self.room_shade, (list,tuple)):
             shade = '#{:2X}{:2X}{:2X}'.format(
-                max(min(int(f_self.room_shade[0] * 255), 255), 0))
+                max(min(int(f_self.room_shade[0] * 255), 255), 0),
+                max(min(int(f_self.room_shade[1] * 255), 255), 0),
+                max(min(int(f_self.room_shade[2] * 255), 255), 0))
         else:
             shade = '${:2d}'.format(max(min(int(f_self.room_shade*100), 99), 0))
-        returnval = self.f(f_self, ''.join(sorted(f_self.room_flags)) + shade, *args)
+
+        if f_self.room_textcolor is None:
+            tcolor = ''
+        else:
+            tcolor = '*{:2X}{:2X}{:2X}'.format(
+                max(min(int(f_self.room_textcolor[0] * 255), 255), 0),
+                max(min(int(f_self.room_textcolor[1] * 255), 255), 0),
+                max(min(int(f_self.room_textcolor[2] * 255), 255), 0))
+
+        returnval = self.f(f_self, ''.join(sorted(f_self.room_flags)) + shade + tcolor, *args)
         f_self.room_flags.clear()
         f_self.exit_flags.clear()
         f_self.exit_direction = None
         f_self.exit_length = DEFAULT_EXIT_LENGTH
         f_self.room_shade = None
+        f_self.room_textcolor = None
         return returnval
 
 class ExitAttributes (object):
@@ -210,11 +222,21 @@ class ExitAttributes (object):
         if f_self.exit_direction is None:
             raise MapFileFormatError('No direction specified for room exit!')
 
-        returnval = self.f(f_self, f_self.exit_direction, ''.join(sorted(f_self.exit_flags)), *args)
+        if f_self.exit_color is None:
+            ecolor = ''
+        else:
+            ecolor = '*{:2X}{:2X}{:2X}'.format(
+                max(min(int(f_self.exit_color[0] * 255), 255), 0),
+                max(min(int(f_self.exit_color[1] * 255), 255), 0),
+                max(min(int(f_self.exit_color[2] * 255), 255), 0))
+
+        returnval = self.f(f_self, f_self.exit_direction, ''.join(sorted(f_self.exit_flags))+ecolor, *args)
         f_self.exit_flags.clear()
         f_self.exit_direction = None
+        f_self.exit_color = None
         f_self.exit_length= DEFAULT_EXIT_LENGTH
         f_self.room_shade = None
+        f_self.room_textcolor = None
         return returnval
 
 class RequireArgs (object):
@@ -601,6 +623,8 @@ class MapSource (object):
         self.exit_direction = None
         self.exit_length= DEFAULT_EXIT_LENGTH
         self.room_shade = None
+        self.room_textcolor = None
+        self.exit_color = None
         self.current_room_exits = None
         self.current_point = None
         self.drawing_mode_list = None
@@ -784,8 +808,10 @@ class MapSource (object):
         ps_room_flags = {
             'curved':   'c',
             'dark':     'd',
+            'textfont': 'f',
             'proto':    'p',
             'outdoor':  'o',
+            'phantom':  'x',
         }
         ps_exit_directions = {
             'north':    'n',
@@ -803,6 +829,7 @@ class MapSource (object):
             'offpage':  'x',
             'special':  '!',
             'locked':   'L',
+            'gap':      'g',
         }
         ps_drawing_flags = {  # fill is also 'f'
             'cp':       'c',
@@ -831,6 +858,10 @@ class MapSource (object):
                     self.exit_direction = ps_exit_directions[ps_token]
             elif ps_token == 'rgbshaded':
                 self._ps_rgbshaded()
+            elif ps_token == 'textcolor':
+                self._ps_textcolor()
+            elif ps_token == 'exitcolor':
+                self._ps_exitcolor()
             elif ps_token == 'shaded':
                 self._ps_shaded()
             elif ps_token == 'passageLength' or ps_token == 'passagelength':
@@ -1557,6 +1588,20 @@ class MapSource (object):
     @RequireArgs('shaded', 'k')
     def _ps_shaded(self):
         self.room_shade = self.stack.pop()
+
+    @RequireArgs('exitcolor', 'kkk')
+    def _ps_exitcolor(self):
+        b = self.stack.pop()
+        g = self.stack.pop()
+        r = self.stack.pop()
+        self.exit_color = (r,g,b)
+
+    @RequireArgs('textcolor', 'kkk')
+    def _ps_textcolor(self):
+        b = self.stack.pop()
+        g = self.stack.pop()
+        r = self.stack.pop()
+        self.room_textcolor = (r,g,b)
 
     @RequireArgs('rgbshaded', 'kkk')
     def _ps_rgbshaded(self):

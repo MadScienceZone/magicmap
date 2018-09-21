@@ -80,6 +80,7 @@ class MapCanvas (ScrolledCanvas):
         self.graph_paper_mode = False
         self._shade_pattern = re.compile(r'\$(\d\d)')
         self._color_pattern = re.compile(r'\#([0-9a-fA-F]{6})')
+        self._xcolor_pattern = re.compile(r'\*([0-9a-fA-F]{6})')
         self.config = config
         self.zoom_factor = 1.0
         self.image_dir = image_dir
@@ -253,9 +254,10 @@ class MapCanvas (ScrolledCanvas):
         p       standard coloring for prototype rooms
         $nn     fill with grayscale level nn (00-99) as a percentage (00=black, 99=almost white)
         #rrggbb fill with RGB color where rr,gg,bb are 00-ff hex values
+        *rrggbb extra color (e.g., exits, room text)
         @       change standard colors for current player location
 
-        returns tuple (line color, line width, fill color, dash pattern, door_color).
+        returns tuple (line color, line width, fill color, dash pattern, door_color, xcolor).
         Individual elements of that tuple are taken from room standard colors if not overridden
         by these flags.
         '''
@@ -264,6 +266,8 @@ class MapCanvas (ScrolledCanvas):
         # default indoor lit room: black thin lines, white fill
         #
         dash_pattern = None
+        x_color = None
+
         line_width = 2 if 'o' in flags else 1
         if '@' in flags:
             line_color = Color(.5,.5,0) if 'o' in flags else Color(1,0,0)
@@ -275,6 +279,7 @@ class MapCanvas (ScrolledCanvas):
 
         shade = self._shade_pattern.search(flags)
         color = self._color_pattern.search(flags)
+        xcolor = self._xcolor_pattern.search(flags)
 
         if shade:
             fill_color = GreyLevel(int(shade.group(1)) / 100.0)
@@ -282,11 +287,15 @@ class MapCanvas (ScrolledCanvas):
             fill_color = Color(int(color.group(1)[0:2], 16) / 255.0,
                                int(color.group(1)[2:4], 16) / 255.0,
                                int(color.group(1)[4:6], 16) / 255.0)
+        if xcolor:
+            x_color = Color(int(xcolor.group(1)[0:2], 16) / 255.0,
+                            int(xcolor.group(1)[2:4], 16) / 255.0,
+                            int(xcolor.group(1)[4:6], 16) / 255.0)
 
         if 'p' in flags:
             dash_pattern = DashPattern([4,3], 0)
             
-        return (line_color, line_width, fill_color, dash_pattern, door_color)
+        return (line_color, line_width, fill_color, dash_pattern, door_color, x_color)
 
     def _normalize_point_list(self, coord_list):
         if not coord_list or not isinstance(coord_list, list) or len(coord_list) % 2 != 0:
@@ -302,7 +311,7 @@ class MapCanvas (ScrolledCanvas):
 
     def draw_map_maze_corridors(self, flags, coord_list):
         "[Mflags, [x0, y0, x1, y1, ..., xn, yn]] -> draw a maze of twisty passages"
-        line_color, line_width, fill_color, dash_pattern, door_color = self._color_from_flags(flags)
+        line_color, line_width, fill_color, dash_pattern, door_color, x_color = self._color_from_flags(flags)
         points = self._normalize_point_list(coord_list)
 
         if 'a' in flags:
@@ -400,7 +409,7 @@ class MapCanvas (ScrolledCanvas):
         if w == 'R' or w == 'r':
             return self.draw_map_round_room(flags, x, y, h, t1, t2, exits)
 
-        line_color, line_width, fill_color, dash_pattern, door_color = self._color_from_flags(flags)
+        line_color, line_width, fill_color, dash_pattern, door_color, x_color = self._color_from_flags(flags)
         #
         # Standard rectangular room
         #
@@ -415,28 +424,36 @@ class MapCanvas (ScrolledCanvas):
 
         p1 = self._pos_map2tk(Point(x, y+h))
         p2 = self._pos_map2tk(Point(x+w, y))
-        self.canvas.create_rectangle(p1.x, p1.y, p2.x, p2.y, **opts)
-        #
-        # titles
-        #
-        self.set_map_color(GreyLevel(0))
-        self.set_map_font(FontSelection('t',8))
+
+        if 'x' not in flags:
+            self.canvas.create_rectangle(p1.x, p1.y, p2.x, p2.y, **opts)
+
+        if x_color is not None:
+            self.set_map_color(x_color)
+        else:
+            self.set_map_color(GreyLevel(0))
+
+        if 'f' not in flags:
+            self.set_map_font(FontSelection('t',8))
+
         cx = x + w/2
         cy = y + h/2
-        if t2:
-            #self._draw_map_text(cx, cy + max(4, h/8), t1, center_on_xy=True)
-            #self._draw_map_text(cx, cy - max(4, h/8), t2, center_on_xy=True)
-            self._fit_map_text('m', x+.5,cy+.5, w-1, h/2-1, t1)
-            self._fit_map_text('m', x+.5, y+.5, w-1, h/2-1, t2)
-        else:
-            #self._draw_map_text(cx, cy, t1, center_on_xy=True)
-            self._fit_map_text('m', x+.5, y+.5, w-1, h-1, t1)
+        if 'x' not in flags:
+            if t2:
+                #self._draw_map_text(cx, cy + max(4, h/8), t1, center_on_xy=True)
+                #self._draw_map_text(cx, cy - max(4, h/8), t2, center_on_xy=True)
+                self._fit_map_text('m', x,cy, w, h/2, t1)
+                self._fit_map_text('m', x, y, w, h/2, t2)
+            else:
+                #self._draw_map_text(cx, cy, t1, center_on_xy=True)
+                self._fit_map_text('m', x, y, w, h, t1)
 
+        self.set_map_color(GreyLevel(0))
         self._handle_exits(exits, Point(cx, cy), Point(w/2, h/2), Point(w/2, h/2),
-            (line_color, line_width, fill_color, dash_pattern, door_color))
+            (line_color, line_width, fill_color, dash_pattern, door_color, x_color))
 
     def _handle_exits(self, exits, center, R, RR, colors, circular=False):
-        line_color, line_width, fill_color, dash_pattern, door_color = colors
+        line_color, line_width, fill_color, dash_pattern, door_color, x_color = colors
         vectors = { #    V                    V2              L              Tilted?
                 'n':    (Point(   +0,  +R.y), Point  (+0,+R.y), Point(+0, +1), False),
                 's':    (Point(   +0,  -R.y), Point(  +0,-R.y), Point(+0, -1), False),
@@ -461,7 +478,9 @@ class MapCanvas (ScrolledCanvas):
         for direction_code, corridor_length in exits:
             if direction_code[0] not in vectors:
                 raise InvalidDrawingElement('Room exit direction code {} is not valid.'.format(direction_code))
+
             V, V2, U, tilted = vectors[direction_code[0]]
+            x_color = self._color_from_flags(direction_code)[5]
             
             # U is our unit vector showing the direction from start_point
             start_point = center + V
@@ -476,7 +495,7 @@ class MapCanvas (ScrolledCanvas):
 
                 opts = {
                     'width': self._width(1),
-                    'fill': line_color.rgb,
+                    'fill': '#000000' if x_color is None else x_color.rgb,
                 }
                 if 'i' in direction_code:
                     if 'o' in direction_code:
@@ -494,6 +513,8 @@ class MapCanvas (ScrolledCanvas):
                 p2 = self._pos_map2tk(end_point)
 
                 self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, **opts)
+
+            exit_color = GreyLevel(0) if x_color is None else x_color
 
             if 'D' in direction_code or 'L' in direction_code:
                 #
@@ -524,11 +545,16 @@ class MapCanvas (ScrolledCanvas):
                     #p2 = self._pos_map2tk(start_point + Point(+6,0))
                     #p3 = self._pos_map2tk(start_point + Point(0,+6))
                     #p4 = self._pos_map2tk(start_point + Point(-6,0))
-                    self.canvas.create_polygon(p1.x, p1.y, p2.x, p2.y, p4.x, p4.y, p3.x, p3.y,
-                        fill=door_color.rgb, outline=line_color.rgb, width=self._width(1))
+                    if 'g' in direction_code:
+                        sp = self._pos_map2tk(start_point)
+                        self.canvas.create_polygon(p1.x, p1.y, p2.x, p2.y, sp.x, sp.y,
+                            fill=fill_color.rgb, outline=fill_color.rgb, width=self._width(line_width))
+                    else:
+                        self.canvas.create_polygon(p1.x, p1.y, p2.x, p2.y, p4.x, p4.y, p3.x, p3.y,
+                            fill=door_color.rgb, outline=exit_color.rgb, width=self._width(1))
                     if 'L' in direction_code:
-                        self.canvas.create_line(p1.x, p1.y, p4.x, p4.y, width=self._width(1), fill=line_color.rgb)
-                        self.canvas.create_line(p2.x, p2.y, p3.x, p3.y, width=self._width(1), fill=line_color.rgb)
+                        self.canvas.create_line(p1.x, p1.y, p4.x, p4.y, width=self._width(1), fill=exit_color.rgb)
+                        self.canvas.create_line(p2.x, p2.y, p3.x, p3.y, width=self._width(1), fill=exit_color.rgb)
                 else:
                     #p1 = self._pos_map2tk(start_point + Point(-4,-4))
                     #p2 = self._pos_map2tk(start_point + Point(-4,+4))
@@ -536,11 +562,17 @@ class MapCanvas (ScrolledCanvas):
                     #p4 = self._pos_map2tk(start_point + Point(+4,-4))
                     p1 = self._pos_map2tk(Point(start_point.x - (0 if U.x>0 else 4), start_point.y + (0 if U.y<0 else 4)))
                     p2 = self._pos_map2tk(Point(start_point.x + (0 if U.x<0 else 4), start_point.y - (0 if U.y>0 else 4)))
-                    self.canvas.create_rectangle(p1.x, p1.y, p2.x, p2.y,
-                        fill=door_color.rgb, outline=line_color.rgb, width=self._width(1))
+                    if 'g' in direction_code:
+                        p1a = self._pos_map2tk(Point(start_point.x - (0 if U.x!=0 else 4), start_point.y + (0 if U.y!=0 else 4)))
+                        p2a = self._pos_map2tk(Point(start_point.x + (0 if U.x!=0 else 4), start_point.y - (0 if U.y!=0 else 4)))
+                        self.canvas.create_line(p1a.x, p1a.y, p2a.x, p2a.y,
+                            fill=fill_color.rgb, width=self._width(line_width))
+                    else:
+                        self.canvas.create_rectangle(p1.x, p1.y, p2.x, p2.y,
+                            fill=door_color.rgb, outline=exit_color.rgb, width=self._width(1))
                     if 'L' in direction_code:
-                        self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, width=self._width(1), fill=line_color.rgb)
-                        self.canvas.create_line(p1.x, p2.y, p2.x, p1.y, width=self._width(1), fill=line_color.rgb)
+                        self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, width=self._width(1), fill=exit_color.rgb)
+                        self.canvas.create_line(p1.x, p2.y, p2.x, p1.y, width=self._width(1), fill=exit_color.rgb)
 
             #if 'L' in direction_code:
                 #p1 = self._pos_map2tk(start_point + Point(-1,+1))
@@ -551,7 +583,7 @@ class MapCanvas (ScrolledCanvas):
 
 
     def draw_map_round_room(self, flags, x, y, radius, t1, t2, exits):
-        line_color, line_width, fill_color, dash_pattern, door_color = self._color_from_flags(flags)
+        line_color, line_width, fill_color, dash_pattern, door_color, x_color = self._color_from_flags(flags)
 
         p1 = self._pos_map2tk(Point(x-radius, y+radius))
         p2 = self._pos_map2tk(Point(x+radius, y-radius))
@@ -566,24 +598,33 @@ class MapCanvas (ScrolledCanvas):
             opts['dash'] = self._dash(dash_pattern.pattern)
             opts['dashoffset'] = self._width(dash_pattern.offset)
 
-        self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, **opts)
+        if 'x' not in flags:
+            self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, **opts)
 
         #
         # titles
         #
-        self.set_map_color(GreyLevel(0))
-        self.set_map_font(FontSelection('t',8))
-        if t2:
-            #self._draw_map_text(x, y + max(4, radius/6), t1, center_on_xy=True)
-            #self._draw_map_text(x, y - max(4, radius/6), t2, center_on_xy=True)
-            self._fit_map_text('s', x-radius+1, y, radius*2-2, 0, t1)
-            self._fit_map_text('n', x-radius+1, y, radius*2-2, 0, t2)
+        if x_color is None:
+            self.set_map_color(GreyLevel(0))
         else:
-            #self._draw_map_text(x, y, t1, center_on_xy=True)
-            self._fit_map_text('m', x-radius+1, y, radius*2-2, 0, t1)
+            self.set_map_color(x_color.rgb)
 
+        if 'f' not in flags:
+            self.set_map_font(FontSelection('t',8))
+
+        if 'x' not in flags:
+            if t2:
+                #self._draw_map_text(x, y + max(4, radius/6), t1, center_on_xy=True)
+                #self._draw_map_text(x, y - max(4, radius/6), t2, center_on_xy=True)
+                self._fit_map_text('s', x-radius, y, radius*2, 0, t1)
+                self._fit_map_text('n', x-radius, y, radius*2, 0, t2)
+            else:
+                #self._draw_map_text(x, y, t1, center_on_xy=True)
+                self._fit_map_text('m', x-radius, y, radius*2, 0, t1)
+
+        self.set_map_color(GrayLevel(0))
         self._handle_exits(exits, Point(x, y), Point(radius, radius), Point(radius*.7071, radius*.7071), 
-            (line_color, line_width, fill_color, dash_pattern, door_color), True)
+            (line_color, line_width, fill_color, dash_pattern, door_color, x_color), True)
 
         
     def _fit_map_text(self, flags, x, y, w, h, text):
