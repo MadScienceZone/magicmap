@@ -81,6 +81,8 @@ class MapCanvas (ScrolledCanvas):
         self._shade_pattern = re.compile(r'\$(\d\d)')
         self._color_pattern = re.compile(r'\#([0-9a-fA-F]{6})')
         self._xcolor_pattern = re.compile(r'\*([0-9a-fA-F]{6})')
+        self._exit_pattern = re.compile(r'[MDgpTCSt]')
+        self._gap_pattern = re.compile(r'[MgpT]')
         self.config = config
         self.zoom_factor = 1.0
         self.image_dir = image_dir
@@ -331,6 +333,11 @@ class MapCanvas (ScrolledCanvas):
         self.draw_map_box(x, y, 20, 20)
         self.draw_map_text(Point(x+10, y+10), text, center_on_xy=True)
 
+    def _draw_tk_dot(self, center, radius, color):
+        # coordinates already in Tk units and positions
+        self.canvas.create_oval(center.x-radius, center.y-radius, center.x+radius, center.y+radius,
+            fill=color.rgb, width=0)
+
     def draw_map_dot_mark(self, flags, x, y, radius):
         "[O, x, y, radius] -> draw possibly-filled dot centered at (x,y) in current color"
         p1 = self._pos_map2tk(Point(x-radius, y+radius))
@@ -440,12 +447,9 @@ class MapCanvas (ScrolledCanvas):
         cy = y + h/2
         if 'x' not in flags:
             if t2:
-                #self._draw_map_text(cx, cy + max(4, h/8), t1, center_on_xy=True)
-                #self._draw_map_text(cx, cy - max(4, h/8), t2, center_on_xy=True)
                 self._fit_map_text('m', x,cy, w, h/2, t1)
                 self._fit_map_text('m', x, y, w, h/2, t2)
             else:
-                #self._draw_map_text(cx, cy, t1, center_on_xy=True)
                 self._fit_map_text('m', x, y, w, h, t1)
 
         self.set_map_color(GreyLevel(0))
@@ -454,7 +458,7 @@ class MapCanvas (ScrolledCanvas):
 
     def _handle_exits(self, exits, center, R, RR, colors, circular=False):
         line_color, line_width, fill_color, dash_pattern, door_color, x_color = colors
-        vectors = { #    V                    V2              L              Tilted?
+        vectors = { #   V                     V2                L              Tilted?
                 'n':    (Point(   +0,  +R.y), Point  (+0,+R.y), Point(+0, +1), False),
                 's':    (Point(   +0,  -R.y), Point(  +0,-R.y), Point(+0, -1), False),
                 'e':    (Point( +R.x,    +0), Point(+R.x,  +0), Point(+1, +0), False),
@@ -470,8 +474,8 @@ class MapCanvas (ScrolledCanvas):
                 max_point = Point(700,580) if self.landscape else Point(580,700)
                 min_point = Point(30,30)
                 return Point(
-                    max(min(start.x + length.x * 100000, max_point.x), min_point.x),
-                    max(min(start.y + length.y * 100000, max_point.y), min_point.y),
+                    max(min(start.x + length.x * self.canvas_w, max_point.x), min_point.x),
+                    max(min(start.y + length.y * self.canvas_h, max_point.y), min_point.y),
                 )
             return start + length
 
@@ -484,11 +488,33 @@ class MapCanvas (ScrolledCanvas):
             
             # U is our unit vector showing the direction from start_point
             start_point = center + V
+            #
+            # if there's a door here also, we need to move the corridor
+            # back so it's not concealed under the door.
+            #
+            # Round rooms need all corridors moved a door-width out.
+            # Square rooms only need it for n,s,e,w directions.
+            #
+            #         Rect. Round
+            #     U    Adj   Adj
+            # N +0,+1 +0,+4 +0,+4
+            # S +0,-1 +0,-4 +0,-4
+            # E +1,+0 +4,+0 +4,+0
+            # W -1,+0 -4,+0 -4,+0
+            #NE +1,+1   -  +√8,+√8
+            #NW -1,+1   -  -√8,+√8
+            #SE +1,-1   -  +√8,-√8
+            #SW -1,-1   -  -√8,-√8
+            #
+            corridor_start_point = start_point.clone()
+            if 'D' in direction_code or 'T' in direction_code:
+                if not tilted:
+                    corridor_start_point += U * Point(4,4) 
+                elif circular:
+                    corridor_start_point += U * Point(math.sqrt(8),math.sqrt(8))
+
             if corridor_length > 0:
                 # draw line from center+V to the point length*L from there in x and y directions
-                #print("corridor length {0} from center ({1.x},{1.y}) + vector ({2.x},{2.y}) code {3}".format(
-                #    corridor_length, center, V, direction_code
-                #))
                 L = U.clone()
                 L.scale(corridor_length)
                 end_point = extended(center + V2, L, direction_code)
@@ -497,11 +523,12 @@ class MapCanvas (ScrolledCanvas):
                     'width': self._width(1),
                     'fill': '#000000' if x_color is None else x_color.rgb,
                 }
-                if 'i' in direction_code:
-                    if 'o' in direction_code:
-                        opts['arrow'] = tk.BOTH
-                    else:
-                        opts['arrow'] = tk.FIRST
+                if 'i' in direction_code:           # although, really, this is kind of silly...
+                    if 'o' in direction_code:       # an in-only and out-only corridor is kind of 
+                        opts['arrow'] = tk.BOTH     # just a corridor :)
+                    else:                           
+                        opts['arrow'] = tk.FIRST    
+
                 elif 'o' in direction_code:
                     opts['arrow'] = tk.LAST
 
@@ -509,17 +536,38 @@ class MapCanvas (ScrolledCanvas):
                     opts['dash'] = self._dash([4,2])
                     opts['dashoffset'] = 0
 
-                p1 = self._pos_map2tk(start_point)
+                p1 = self._pos_map2tk(corridor_start_point)
                 p2 = self._pos_map2tk(end_point)
 
                 self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, **opts)
 
-            exit_color = GreyLevel(0) if x_color is None else x_color
+            if x_color is None:
+                exit_color = GreyLevel(0)
+                portal_color = Color(0,0,1)
+            else:
+                exit_color = portal_color = x_color
 
-            if 'D' in direction_code or 'L' in direction_code:
-                #
-                # Door in this wall (regardless of if there's an actual corridor)
-                #
+            #
+            # Calculate the location of points we'll need to draw the various door
+            # effects
+            #                       P4      P1_P6_       P3
+            #                  P6=Ps___P2___|_____|_____P1_Ps=P6
+            #                   P3 | P5   P1a Ps P2      P5| P4
+            #                      P1         P5 P2a       P2
+            #                  P1  |                       |
+            #                   +--|P1a              P1a=P1|--+
+            #                 P6|  |Ps=P5    ROOM     P5=Ps|  |P6
+            #                   +--|P2=P2a              P2a|--+P2
+            #                      |                       |
+            #                      |                       P2
+            #                      P1     P1a P5         P5|
+            #                   P3 |_P5____P1_Ps_P2a___P1__| P4
+            #                  P6=Ps   P2   |____|         Ps=P6
+            #                       P4        P6 P2      P3
+            #
+                
+            if self._exit_pattern.search(direction_code):
+                Ps = self._pos_map2tk(start_point)
                 if tilted:
                     # 45 degree angled doors for diagonal exits
                     s2 = math.sqrt(2)
@@ -534,53 +582,104 @@ class MapCanvas (ScrolledCanvas):
                         _p2 = _p4
                         _p3 = _p1 + U*Point(s8,s8)
                         _p4 = _p2 + U*Point(s8,s8)
-                    p1 = self._pos_map2tk(_p1)
-                    p2 = self._pos_map2tk(_p2)
-                    p3 = self._pos_map2tk(_p3)
-                    p4 = self._pos_map2tk(_p4)
-                    #
-                    # Rotate the door 45 degrees to fit into a round room
-                    #
-                    #p1 = self._pos_map2tk(start_point + Point(0,-6))
-                    #p2 = self._pos_map2tk(start_point + Point(+6,0))
-                    #p3 = self._pos_map2tk(start_point + Point(0,+6))
-                    #p4 = self._pos_map2tk(start_point + Point(-6,0))
-                    if 'g' in direction_code:
-                        sp = self._pos_map2tk(start_point)
-                        self.canvas.create_polygon(p1.x, p1.y, p2.x, p2.y, sp.x, sp.y,
+                    P1 = self._pos_map2tk(_p1)
+                    P2 = self._pos_map2tk(_p2)
+                    P3 = self._pos_map2tk(_p3)
+                    P4 = self._pos_map2tk(_p4)
+                    P5 = self._pos_map2tk(corridor_start_point - U*Point(s8,s8))
+                    P6 = self._pos_map2tk(corridor_start_point)
+                    P1a= P1
+                    P2a= P2
+                else: 
+                    P1 = self._pos_map2tk(Point(start_point.x - (0 if U.x>0 else 4), start_point.y + (0 if U.y<0 else 4)))
+                    P2 = self._pos_map2tk(Point(start_point.x + (0 if U.x<0 else 4), start_point.y - (0 if U.y>0 else 4)))
+                    P1a= self._pos_map2tk(Point(start_point.x - (0 if U.x!=0 else 4), start_point.y + (0 if U.y!=0 else 4)))
+                    P2a= self._pos_map2tk(Point(start_point.x + (0 if U.x!=0 else 4), start_point.y - (0 if U.y!=0 else 4)))
+                    P5 = Ps
+                    P6 = self._pos_map2tk(corridor_start_point)
+                #
+                # gap doorways and magical portals
+                #
+                if self._gap_pattern.search(direction_code):
+                    if tilted:
+                        # gap
+                        self.canvas.create_polygon(P1.x, P1.y, P2.x, P2.y, Ps.x, Ps.y,
                             fill=fill_color.rgb, outline=fill_color.rgb, width=self._width(line_width))
+                        # portal
+                        if 'M' in direction_code:
+                            if tilted and not circular:
+                                if 'D' in direction_code:
+                                    self.canvas.create_line(P1.x, P1.y, P2.x, P2.y,
+                                        fill=portal_color.rgb, width=self._width(4))
+                                else:
+                                    self.canvas.create_polygon(P1.x, P1.y, P2.x, P2.y, P4.x, P4.y, P3.x, P3.y,
+                                        fill=portal_color.rgb, width=0)
+                            else:
+                                self.canvas.create_line(P1.x, P1.y, P2.x, P2.y,
+                                    fill=portal_color.rgb, width=self._width(4))
                     else:
-                        self.canvas.create_polygon(p1.x, p1.y, p2.x, p2.y, p4.x, p4.y, p3.x, p3.y,
-                            fill=door_color.rgb, outline=exit_color.rgb, width=self._width(1))
-                    if 'L' in direction_code:
-                        self.canvas.create_line(p1.x, p1.y, p4.x, p4.y, width=self._width(1), fill=exit_color.rgb)
-                        self.canvas.create_line(p2.x, p2.y, p3.x, p3.y, width=self._width(1), fill=exit_color.rgb)
-                else:
-                    #p1 = self._pos_map2tk(start_point + Point(-4,-4))
-                    #p2 = self._pos_map2tk(start_point + Point(-4,+4))
-                    #p3 = self._pos_map2tk(start_point + Point(+4,+4))
-                    #p4 = self._pos_map2tk(start_point + Point(+4,-4))
-                    p1 = self._pos_map2tk(Point(start_point.x - (0 if U.x>0 else 4), start_point.y + (0 if U.y<0 else 4)))
-                    p2 = self._pos_map2tk(Point(start_point.x + (0 if U.x<0 else 4), start_point.y - (0 if U.y>0 else 4)))
-                    if 'g' in direction_code:
-                        p1a = self._pos_map2tk(Point(start_point.x - (0 if U.x!=0 else 4), start_point.y + (0 if U.y!=0 else 4)))
-                        p2a = self._pos_map2tk(Point(start_point.x + (0 if U.x!=0 else 4), start_point.y - (0 if U.y!=0 else 4)))
-                        self.canvas.create_line(p1a.x, p1a.y, p2a.x, p2a.y,
+                        # gap
+                        self.canvas.create_line(P1a.x, P1a.y, P2a.x, P2a.y,
                             fill=fill_color.rgb, width=self._width(line_width))
-                    else:
-                        self.canvas.create_rectangle(p1.x, p1.y, p2.x, p2.y,
+                        # portal
+                        if 'M' in direction_code:
+                            self.canvas.create_line(P1a.x, P1a.y, P2a.x, P2a.y,
+                                fill=portal_color.rgb, width=self._width(4))
+                    #
+                    # portcullis
+                    #
+                    if 'p' in direction_code:
+                        self._draw_tk_dot(P1a, self._width(1.9), exit_color)
+                        self._draw_tk_dot(Ps,  self._width(1.9), exit_color)
+                        self._draw_tk_dot(P2a, self._width(1.9), exit_color)
+                    #
+                    # turnstile
+                    #
+                    if 'T' in direction_code:
+                        r = self._width(3)
+                        s3_2 = math.sqrt(3)/2
+                        p = P5 if tilted and not circular else Ps
+                        self.canvas.create_line(p.x-r, p.y, p.x+r, p.y, 
+                            fill=exit_color.rgb, width=self._width(1))
+                        self.canvas.create_line(p.x-0.5*r, p.y-s3_2*r, p.x+0.5*r, p.y+s3_2*r,
+                            fill=exit_color.rgb, width=self._width(1))
+                        self.canvas.create_line(p.x+0.5*r, p.y-s3_2*r, p.x-0.5*r, p.y+s3_2*r,
+                            fill=exit_color.rgb, width=self._width(1))
+                #
+                # secret doors
+                #
+                if 'S' in direction_code:
+                    self.canvas.create_text(Ps.x, Ps.y, anchor=tk.CENTER, fill=exit_color.rgb,
+                        font=self.font_cache[self.load_font(FontSelection('s', 10))], text="S")
+                #
+                # concealed doors
+                #
+                elif 'C' in direction_code:
+                    self.canvas.create_text(Ps.x, Ps.y, anchor=tk.CENTER, fill=exit_color.rgb,
+                        font=self.font_cache[self.load_font(FontSelection('s', 10))], text="C")
+                #
+                # normal doors
+                #
+                elif 'D' in direction_code:
+                    if tilted:
+                        self.canvas.create_polygon(P1.x, P1.y, P2.x, P2.y, P4.x, P4.y, P3.x, P3.y,
                             fill=door_color.rgb, outline=exit_color.rgb, width=self._width(1))
-                    if 'L' in direction_code:
-                        self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, width=self._width(1), fill=exit_color.rgb)
-                        self.canvas.create_line(p1.x, p2.y, p2.x, p1.y, width=self._width(1), fill=exit_color.rgb)
-
-            #if 'L' in direction_code:
-                #p1 = self._pos_map2tk(start_point + Point(-1,+1))
-                #p2 = self._pos_map2tk(start_point + Point(+1,-1))
-                #self.canvas.create_oval(p1.x, p1.y, p2.x, p2.y, fill=line_color.rgb,
-                    #outline=line_color.rgb, width=self._width(1))
-
-
+                    else:
+                        self.canvas.create_rectangle(P1.x, P1.y, P2.x, P2.y,
+                            fill=door_color.rgb, outline=exit_color.rgb, width=self._width(1))
+                    if '2' in direction_code:
+                        self.canvas.create_line(P5.x, P5.y, P6.x, P6.y,
+                            fill=exit_color.rgb, width=self._width(1))
+                #
+                # locked exits
+                #
+                if 'L' in direction_code:
+                    if tilted:
+                        self.canvas.create_line(P1.x, P1.y, P4.x, P4.y, width=self._width(1), fill=exit_color.rgb)
+                        self.canvas.create_line(P2.x, P2.y, P3.x, P3.y, width=self._width(1), fill=exit_color.rgb)
+                    else:
+                        self.canvas.create_line(P1.x, P1.y, P2.x, P2.y, width=self._width(1), fill=exit_color.rgb)
+                        self.canvas.create_line(P1.x, P2.y, P2.x, P1.y, width=self._width(1), fill=exit_color.rgb)
 
     def draw_map_round_room(self, flags, x, y, radius, t1, t2, exits):
         line_color, line_width, fill_color, dash_pattern, door_color, x_color = self._color_from_flags(flags)
@@ -614,19 +713,15 @@ class MapCanvas (ScrolledCanvas):
 
         if 'x' not in flags:
             if t2:
-                #self._draw_map_text(x, y + max(4, radius/6), t1, center_on_xy=True)
-                #self._draw_map_text(x, y - max(4, radius/6), t2, center_on_xy=True)
                 self._fit_map_text('s', x-radius, y, radius*2, 0, t1)
                 self._fit_map_text('n', x-radius, y, radius*2, 0, t2)
             else:
-                #self._draw_map_text(x, y, t1, center_on_xy=True)
                 self._fit_map_text('m', x-radius, y, radius*2, 0, t1)
 
-        self.set_map_color(GrayLevel(0))
+        self.set_map_color(GreyLevel(0))
         self._handle_exits(exits, Point(x, y), Point(radius, radius), Point(radius*.7071, radius*.7071), 
             (line_color, line_width, fill_color, dash_pattern, door_color, x_color), True)
 
-        
     def _fit_map_text(self, flags, x, y, w, h, text):
         self.fit_map_text(flags, Point(x,y), Point(w,h), text)
 
@@ -957,6 +1052,7 @@ class MapCanvas (ScrolledCanvas):
             # Draw rooms
             #
             for room in list(self.page_obj.rooms.values()):
+                #print(repr(room.map))
                 self._render_map_element_list(
                         '{0}, Room {1}{2}'.format(
                             page_context,
@@ -980,8 +1076,8 @@ class MapCanvas (ScrolledCanvas):
 
     def cross_hair(self, center):
         #print("CROSS HAIR AT {0.x},{0.y}".format(center))
-        self.canvas.create_line(0, center.y, 1000, center.y, fill='#ff0000', width=1, dash='-..')
-        self.canvas.create_line(center.x, 0, center.x, 1000, fill='#ff0000', width=1, dash='-..')
+        self.canvas.create_line(0, center.y, self.canvas_w, center.y, fill='#ff0000', width=1, dash='-..')
+        self.canvas.create_line(center.x, 0, center.x, self.canvas_h, fill='#ff0000', width=1, dash='-..')
 
     def _render_map_element_list(self, context, element_list, is_current_location=False):
         if element_list is None:

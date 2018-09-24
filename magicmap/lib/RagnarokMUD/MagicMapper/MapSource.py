@@ -190,7 +190,7 @@ class RoomAttributes (object):
         if f_self.room_shade is None:
             shade = ''
         elif isinstance(f_self.room_shade, (list,tuple)):
-            shade = '#{:2X}{:2X}{:2X}'.format(
+            shade = '#{:02X}{:02X}{:02X}'.format(
                 max(min(int(f_self.room_shade[0] * 255), 255), 0),
                 max(min(int(f_self.room_shade[1] * 255), 255), 0),
                 max(min(int(f_self.room_shade[2] * 255), 255), 0))
@@ -200,7 +200,7 @@ class RoomAttributes (object):
         if f_self.room_textcolor is None:
             tcolor = ''
         else:
-            tcolor = '*{:2X}{:2X}{:2X}'.format(
+            tcolor = '*{:02X}{:02X}{:02X}'.format(
                 max(min(int(f_self.room_textcolor[0] * 255), 255), 0),
                 max(min(int(f_self.room_textcolor[1] * 255), 255), 0),
                 max(min(int(f_self.room_textcolor[2] * 255), 255), 0))
@@ -225,7 +225,7 @@ class ExitAttributes (object):
         if f_self.exit_color is None:
             ecolor = ''
         else:
-            ecolor = '*{:2X}{:2X}{:2X}'.format(
+            ecolor = '*{:02X}{:02X}{:02X}'.format(
                 max(min(int(f_self.exit_color[0] * 255), 255), 0),
                 max(min(int(f_self.exit_color[1] * 255), 255), 0),
                 max(min(int(f_self.exit_color[2] * 255), 255), 0))
@@ -383,7 +383,7 @@ class MapSource (object):
     This object class understands the map file format and can
     render images of the map.'''
 
-    _IGNORE_LINE= re.compile(r'^#|^\s*$')
+    _IGNORE_LINE= re.compile(r'^#|^\s*$|^%')
     _FIELD_CONT = re.compile(r'^\s+(?P<moretext>\S.*?)\s*$')
     _FIELD_DECL = re.compile(r'^(?P<tag>\w+)\s*:\s*(?P<value>.*?)\s*$')
     _INT_BASE   = re.compile(r'^\s*(?P<base>\d+)#(?P<value>[0-9A-Za-z]+)\s*$')
@@ -824,12 +824,19 @@ class MapSource (object):
             'southwest':'d',
         }
         ps_exit_flags = {   # door is also 'D'
-            'in':       'i',
-            'out':      'o',
-            'offpage':  'x',
-            'special':  '!',
-            'locked':   'L',
-            'gap':      'g',
+            'concealed':  'C',
+            'gap':        'g',
+            'in':         'i',
+            'locked':     'L',
+            'magic':      'M',
+            'out':        'o',
+            'portcullis': 'p',
+            'secret':     'S',
+            #'tapestry':   't',
+            'turnstile':  'T',
+            'offpage':    'x',
+            'special':    '!',
+            'double':     '2',
         }
         ps_drawing_flags = {  # fill is also 'f'
             'cp':       'c',

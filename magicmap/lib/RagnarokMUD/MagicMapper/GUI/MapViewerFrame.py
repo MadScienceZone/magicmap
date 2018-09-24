@@ -86,6 +86,15 @@ class MapViewerFrame (ttk.Frame):
         self.status_w.pack(fill=tk.X, expand=False)
 
     def _setup_menus(self, menu_list):
+        # Build menu bar from a tuple of menu definitions where each entry is a tuple (label, definition).
+        # Each definition is a tuple of menu entries where each menu entry is a tuple (label, binding, function, variable).
+        # A menu entry tuple with None for the title makes a separator bar at that point in the menu.
+        # Otherwise, an entry is created which has:
+        #     * binding to <binding> which must be a key in the keymaps dict (below)
+        #     * action of the binding or menu selection goes to <function>
+        #     * if <variable> is a tk.Menu object, make this entry cascade into that submenu.
+        #     * if <variable> is a tk.IntVar object, make this entry a checkbox following that variable.
+        #
         top = self.winfo_toplevel()
         self.menu_bar = tk.Menu(top)
 
@@ -125,28 +134,34 @@ class MapViewerFrame (ttk.Frame):
             the_menu = tk.Menu(self.menu_bar)
             for title, accel, cmd, variable in item_list:
                 if title:
-                    if accel in keymaps:
-                        if sys.platform == 'darwin':
-                            k = keymaps[accel][0]
-                            if variable is not None:
-                                the_menu.add_checkbutton(label=title, accelerator=k.label,
-                                    command=cmd, variable=variable)
-                            else:
-                                the_menu.add_command(label=title, accelerator=k.label, command=cmd)
-                            self.bind_all(k.keycode, cmd)
+                    if accel is not None and accel in keymaps:
+                        k = keymaps[accel][0 if sys.platform=='darwin' else 1]
+                        if isinstance(variable, tk.IntVar):
+                            the_menu.add_checkbutton(label=title, accelerator=k.label,
+                                command=cmd, variable=variable)
+                        elif isinstance(variable, tk.Menu):
+                            if cmd is not None:
+                                raise ValueError('Command defined for cascading menu item {}'.format(title))
+                            the_menu.add_cascade(label=title, accelerator=k.label, menu=variable)
+                        elif variable is not None:
+                            raise ValueError('Variable for menu item {} not understood.'.format(title))
                         else:
-                            k = keymaps[accel][1]
-                            if variable is not None:
-                                the_menu.add_checkbutton(label=title, accelerator=k.label,
-                                    command=cmd, variable=variable)
-                            else:
-                                the_menu.add_command(label=title, accelerator=k.label, command=cmd)
-                            self.bind_all(k.keycode, cmd)
+                            the_menu.add_command(label=title, accelerator=k.label, command=cmd)
+                        self.bind_all(k.keycode, cmd)
                     else:
-                        if variable is not None:
+                        if isinstance(variable, tk.IntVar):
                             the_menu.add_checkbutton(label=title, command=cmd, variable=variable)
+                        elif isinstance(variable, tk.Menu):
+                            if cmd is not None:
+                                raise ValueError('Command defined for cascading menu item {}'.format(title))
+                            the_menu.add_cascade(label=title, menu=variable)
+                        elif variable is not None:
+                            raise ValueError('Variable for menu item {} not understood.'.format(title))
                         else:
-                            the_menu.add_command(label=title, command=cmd)
+                            if cmd is None:
+                                the_menu.add_command(label=title, state=tk.DISABLED)
+                            else:
+                                the_menu.add_command(label=title, command=cmd)
                 else:
                     the_menu.add_separator()
             self.menu_bar.add_cascade(label=menu, menu=the_menu)
@@ -207,6 +222,8 @@ class MapPreviewFrame (MapViewerFrame):
 For more information, see https://www.rag.com/tech/tools/viewmap.'''
 
         self.grids_active = tk.IntVar(value=0)
+        self._page_menu = tk.Menu()
+        self._page_submenus = []
         self._setup_menus((
             ('File', (
                 ('Open Map File(s)...', 'Cmd+O',      self.open_files,   None),
@@ -220,7 +237,9 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
             ('View', (
                 ('Next page',           'PageDown',   self.next_page,   None),
                 ('Previous page',       'PageUp',     self.prev_page,   None),
+                ('Go To Page',          None,         None,             self._page_menu),
                 ('Refresh',             'Cmd+R',      self.refresh,     None),
+                ('Key to Symbols',      None,         None,             None),
                 (None, None, None, None),
                 ('Normal size',         'Cmd+0',      self.zoom_100,    None),
                 ('Zoom in',             'Cmd++',      self.zoom_in,     None),
@@ -280,6 +299,8 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
         "Read the files the user wants to display into our map collection."
 
         self.set_status_text("Loading Magic Map...")
+        self._page_menu.delete(0, tk.END)
+        self._page_submenus = []
         #
         # Get list of map files to preview
         #
@@ -351,6 +372,23 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
                 self.set_status_text("Loaded Page{1} {0}".format(
                     ', '.join([str(s) for s in sorted(self.world_map.pages)]),
                     ('' if len(self.world_map.pages) == 1 else 's')))
+            if len(self.page_list) <= 10:
+                for i,n in enumerate(self.page_list):
+                    self._page_menu.add_command(label='{} {}'.format(str(n), self.world_map.pages[n].realm or ''), command=(lambda i=i: self._set_page_idx(i)))
+            else:
+                print('Generating menus for {} pages {}-{}'.format(len(self.page_list), self.page_list[0], self.page_list[-1]))
+                tens=-1
+                for i,n in enumerate(self.page_list):
+                    if not tens*10 <= n < tens*10+10:
+                        while not tens*10 <= n < tens*10+10:
+                            tens += 1
+                        self._page_submenus.append(tk.Menu())
+                        self._page_menu.add_cascade(label='{}–{}'.format(tens*10, tens*10+9), menu=self._page_submenus[-1])
+                    print("Map entry #{}, page #{}".format(i, n))
+                    print("title {}".format(self.world_map.pages[n].realm))
+               
+                    self._page_submenus[-1].add_command(label='{} {}'.format(str(n), self.world_map.pages[n].realm or ''), command=(lambda i=i: self._set_page_idx(i)))
+                        
         else:
             self.set_status_text("No pages loaded.")
             self.page_list = []

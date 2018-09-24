@@ -1,0 +1,48 @@
+%
+% Magic Map Key
+%
+room: 	mapkey
+realm:  Key to Map Symbols
+page: 	0
+map:  	20 sf 30 680 mv (Magic Map Symbol Key) show
+	15 sf 
+	/keyfont { 12 sf } def
+	40 660 mv (These are the standard symbols used throughout Ragnarök’s map pages.) show
+	40 645 mv (Some realm authors may have chosen to use their own symbols on their pages,) show
+	40 630 mv (which may be different from what is shown below.) show
+	(Indoor)(Room)30 600 std room	
+	(Outdoor)(Location)30 570 std outdoor room
+	(Virtual)(Location)30 540 std proto room
+		120 540 mv keyfont (\(future rooms, off-page references, etc.\)) 0 20 fittext-w
+	(Dark)(Room)30 510 std dark room
+	()()30 480 std room
+		east passage
+		120 480 mv keyfont (normal passage) 0 20 fittext-w
+	()()30 450 std room
+		east passage
+		east door
+		120 450 mv keyfont (door) 0 20 fittext-w
+	()()30 420 std room
+		east passage
+		east locked door
+		120 420 mv keyfont (locked door) 0 20 fittext-w
+	()()30 390 40 20 room
+		east gap door
+	()()70 390 40 20 room
+		west gap door
+		120 390 mv keyfont (open doorway between adjacent rooms) 0 20 fittext-w
+	()()30 360 std room
+		east special passage
+		120 360 mv keyfont (passage with movement restrictions) 0 20 fittext-w
+	()()30 330 std room
+		east out passage
+		120 330 mv keyfont (one-way passage leading out of room) 0 20 fittext-w
+	()()30 300 std room
+		east in passage
+		120 300 mv keyfont (one-way passage leading into room) 0 20 fittext-w
+	()()30 270 std room
+		east passage
+		80 280 mv 10 ss (S) 0 0 fittext-c
+		120 270 mv keyfont (secret door) 0 20 fittext-w
+	60 250 3 dotmark
+		120 250 mv keyfont (point of interest \(in a maze, etc.\)) 0 0 fittext-w
