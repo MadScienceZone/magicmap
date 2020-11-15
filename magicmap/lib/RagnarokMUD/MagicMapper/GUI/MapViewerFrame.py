@@ -35,6 +35,7 @@ import tkinter.filedialog
 import tkinter.messagebox
 import traceback
 import re
+import platform # needed for correct mouse wheel handling
 
 from glob    import glob
 from fnmatch import fnmatch
@@ -42,6 +43,7 @@ from fnmatch import fnmatch
 from RagnarokMUD.MagicMapper.GUI.MapCanvas import MapCanvas
 from RagnarokMUD.MagicMapper.MapSource     import MapSource, MapFileFormatError, DuplicateRoomError
 from RagnarokMUD.MagicMapper.MapManager    import MapManager
+from RagnarokMUD.MagicMapper.BasicUnits    import Point
 
 class KeyBindingDef:
     def __init__(self, label, keycode):
@@ -60,8 +62,22 @@ def GUI_call(f):
             )
             traceback.print_tb(i[2])
     return _wrapper
-
+    
 class MapViewerFrame (ttk.Frame):
+
+    class MousePosition(object):
+        "Contains the position of the mouse in map coordinates"
+        def __init__(self):
+            self._point = Point(1000, 1000)
+            
+        def text(self):
+            if (self._point.x < 1000 and self._point.y < 1000):
+                return "x: {:6.2f} y: {:6.2f}".format(self._point.x, self._point.y)
+            return "x: ------ y: ------"
+                
+        def update(self, point):
+            self._point = point
+        
     def __init__(self, master=None, title=None, image_dir=None, config=None, prog_name=None, about_text=None, help_text=None, verbose=0, **k):
         ttk.Frame.__init__(self, master, **k)
         self.verbose = verbose
@@ -81,9 +97,38 @@ class MapViewerFrame (ttk.Frame):
 
         self.canvas = MapCanvas(self, config=config, image_dir=image_dir)
         self.canvas.pack(fill=tk.BOTH, expand=True)
+                
+        # Decided to rework mouse wheel support for zoom in and zoom out
+        # rather than scrolling the canvas (which can now be done with
+        # grab and drag (pending)
+        
+        #mousewheel_support = MousewheelSupport(master)
+        #mousewheel_support.add_support_to(self.canvas.canvas, 
+        #    xscrollbar=self.canvas.x_scroll, yscrollbar=self.canvas.y_scroll, 
+        #    what="units")
         
         self.status_w = ttk.Label(self, text='')
         self.status_w.pack(fill=tk.X, expand=False)
+        self._status_message = ''
+
+        self._mouse_position = self.MousePosition()
+        self.canvas.canvas.bind('<Motion>', self._display_coordinates, add="+")
+        
+    # modify this one if you want to control whether the viewer displays mouse coordinates
+    def _refresh_status_text(self):
+        self.status_w['text'] = "{} {}".format(self._mouse_position.text(), self._status_text)
+        
+    def set_status_text(self, text=''):
+        self._status_text = text
+        self._refresh_status_text()
+        
+    def _display_coordinates(self, event):
+        # Causes X and Y to be displayed at the start of the status bar in map coordinates
+        # print("entering display coordinates")
+        point = self.canvas.pos_mouse2map(Point(event.x, event.y))
+        self._mouse_position.update(point)
+        # print("event x: {} event y: {} map x: {} map y: {}".format(event.x, event.y, point.x, point.y))
+        self._refresh_status_text()
 
     def _setup_menus(self, menu_list):
         # Build menu bar from a tuple of menu definitions where each entry is a tuple (label, definition).
@@ -171,9 +216,6 @@ class MapViewerFrame (ttk.Frame):
     def _not_yet(self, *a):
         tk.messagebox.showerror(title="Not Implemented Yet", message='''You wander into a sudden, unexplained dense fog, where only the vaguest outlines of some future construction are visible in the distance. It is not possible to proceed any farther this direction.
 There is a small sign posted here, which simply reads, "This section has not been implemented yet. Please try again with a future version."''')
-        
-    def set_status_text(self, text=''):
-        self.status_w['text'] = text
 
     def close_window(self, *a):
         self.destroy()
@@ -210,7 +252,7 @@ class MapPreviewFrame (MapViewerFrame):
         self.expand_globs = expand_globs
         self.file_list = file_list or []
         self.zoom_idx = 0
-        self.zoom_factors = (1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0)
+        self.zoom_factors = (1.0, 1.1, 1.2, 1.3, 1.4, 1.6, 2.0, 2.5, 3.0)
         self.pattern = pattern
         self.page_idx = None
         self.ignore_errors = ignore_errors
@@ -297,7 +339,10 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
     @GUI_call
     def reload(self, *a): 
         "Read the files the user wants to display into our map collection."
-
+        if self.page_idx is not None: # remember where we are
+            current_page = self.page_list[self.page_idx]
+        else:
+            current_page = None
         self.set_status_text("Loading Magic Map...")
         self._page_menu.delete(0, tk.END)
         self._page_submenus = []
@@ -388,7 +433,11 @@ For more information, see https://www.rag.com/tech/tools/viewmap.'''
                     print("title {}".format(self.world_map.pages[n].realm))
                
                     self._page_submenus[-1].add_command(label='{} {}'.format(str(n), self.world_map.pages[n].realm or ''), command=(lambda i=i: self._set_page_idx(i)))
-                        
+            
+            try: # if we remembered current page, restore it
+                self._set_page_idx(self.page_list.index(current_page))
+            except:
+                self._set_page_idx(0)                
         else:
             self.set_status_text("No pages loaded.")
             self.page_list = []

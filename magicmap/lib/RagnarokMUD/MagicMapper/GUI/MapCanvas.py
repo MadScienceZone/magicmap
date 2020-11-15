@@ -158,6 +158,13 @@ class MapCanvas (ScrolledCanvas):
             'X': (self._set_translation,        2, False),
             'Z': (self._set_scale_factor,       2, False),
         }
+        
+        # enable drag-around with the mouse:
+        self.canvas.bind("<ButtonPress-1>", lambda event: 
+                         event.widget.scan_mark(event.x, event.y))
+        self.canvas.bind("<B1-Motion>", lambda event: 
+                         event.widget.scan_dragto(event.x, event.y, gain=1))
+
         self.refresh()
 
     def set_zoom(self, z):
@@ -182,8 +189,17 @@ class MapCanvas (ScrolledCanvas):
         return int(width * self.zoom_factor)
 
     def _dash(self, a):
+        # Setting the dash pattern relative to zoom levels using _width 
+        #   doesn't work correctly because of rounding; it can mess 
+        #   catastrophically with relative lenghts of dashes and spaces. 
+        #   (And dash pattern must have integers.)
+        # Upd. 10/10 - after some thought and experimentation, going with this,
+        #   as it preserves the ratio(s) of dashes and spaces and looks okay
+        #   at all zoom levels
         if a is None: return None
-        return [self._width(i) for i in a]
+        a = [i * (2*int(self.zoom_factor)-1) for i in a]
+        # print("Current dash pattern: {}".format(a))
+        return a
 
     def _pos_map2tk(self, point, absolute=False):
         "Convert magic map point to canvas coordinates"
@@ -205,6 +221,14 @@ class MapCanvas (ScrolledCanvas):
         new_point.scale(self.zoom_factor)
         return new_point
 
+    def pos_mouse2map(self, point):
+        "Convert mouse position to magic map coordinates (without using scale or translate)"
+        new_point = Point(self.canvas.canvasx(point.x), self.canvas.canvasy(point.y)) # convert from window to canvas pos
+        new_point.scale(1.0 / self.zoom_factor)
+        new_point = Point(new_point.x - self.canvas_left_margin, (610 if self.landscape else 730) - (new_point.y - self.canvas_top_margin))
+        # print("mouse2map returning {} {}".format(new_point.x, new_point.y))
+        return new_point
+        
     def draw_graph_paper(self):
         for width, skip in ((1,5), (2,30)):
             for x in range(30, (700 if self.landscape else 580)+1, skip):
@@ -445,12 +469,14 @@ class MapCanvas (ScrolledCanvas):
 
         cx = x + w/2
         cy = y + h/2
-        if 'x' not in flags:
-            if t2:
-                self._fit_map_text('m', x,cy, w, h/2, t1)
-                self._fit_map_text('m', x, y, w, h/2, t2)
-            else:
-                self._fit_map_text('m', x, y, w, h, t1)
+        # I think text should be allowed in phantom rooms... if you don't
+        # want text, you can always put () () -P.
+        # if 'x' not in flags: 
+        if t2:
+            self._fit_map_text('m', x,cy, w, h/2, t1)
+            self._fit_map_text('m', x, y, w, h/2, t2)
+        else:
+            self._fit_map_text('m', x, y, w, h, t1)
 
         self.set_map_color(GreyLevel(0))
         self._handle_exits(exits, Point(cx, cy), Point(w/2, h/2), Point(w/2, h/2),
@@ -648,7 +674,7 @@ class MapCanvas (ScrolledCanvas):
                 #
                 # secret doors
                 #
-                if 'S' in direction_code:
+                elif 'S' in direction_code:
                     self.canvas.create_text(Ps.x, Ps.y, anchor=tk.CENTER, fill=exit_color.rgb,
                         font=self.font_cache[self.load_font(FontSelection('s', 10))], text="S")
                 #
