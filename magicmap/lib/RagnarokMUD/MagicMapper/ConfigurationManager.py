@@ -44,8 +44,8 @@ class ConfigurationManager (configparser.SafeConfigParser):
         my_home_dir = os.path.expanduser('~')
         if my_home_dir == '~':
             raise InvalidHomeDirectory("unable to determine home directory")
-        my_home_dir = os.path.join(my_home_dir, 
-                ('MagicMapper' if sys.platform.startswith('win') else '.MagicMapper'))
+        my_home_dir = os.path.join(my_home_dir, '.MagicMapper')
+#                ('MagicMapper' if sys.platform.startswith('win') else '.MagicMapper'))
 
         for section_name, section_contents in {
                 'rendering': {
