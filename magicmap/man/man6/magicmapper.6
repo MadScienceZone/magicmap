@@ -1,0 +1,307 @@
+.TH MAGICMAPPER 6 "Magic Mapper" "Ragnarok MUD"
+'\"
+'\" RAGNAROK MAGIC MAPPER DOCUMENTATION:
+'\" $Header$
+'\"
+.\" Copyright (c) 2020 by Steven L. Willoughby, Aloha, Oregon, USA.
+.\" All Rights Reserved.  
+'\" Licensed under the terms of the BSD 3-clause license.
+'\"
+'\" Based on earlier code from the Ragnarok MudShell (MSH) client,
+'\" Copyright (c) 1993, 2000, 2001, 2002, 2003, 2010, 2012, 2018 by 
+'\" Steven L. Willoughby, Aloha, Oregon, USA.  All Rights Reserved.  
+'\"
+'\" This product is provided for educational, experimental or personal
+'\" interest use, in accordance with the terms and conditions of the
+'\" aforementioned license agreement, ON AN "AS IS" BASIS AND WITHOUT
+'\" WARRANTY, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION,
+'\" THE WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A
+'\" PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY OF THE ORIGINAL
+'\" WORK IS WITH YOU.  (See the license agreement for full details,
+'\" including disclaimer of warranty and limitation of liability.)
+'\"
+'\" Under no curcumstances is this product intended to be used where the
+'\" safety of any person, animal, or property depends upon, or is at
+'\" risk of any kind from, the correct operation of this software.
+'\"
+.SH NAME
+magicmapper \- Real-time map display for MUD games
+.SH SYNOPSIS
+.B magicmapper
+.RB [ \-ChlVv ]
+.RB [ \-H
+.IR hostname ]
+.RB [ \-P
+.IR port ]
+.RB [ \-p
+.IR proxyport ]
+.RB [ \-S
+.RI [ version\fB:\fP ][ username [\fB:\fP password ]\fB@\fP] hostname\fB:\fPport ]
+.RB [ \-w
+.IR url ]
+.LP
+.B magicmapper
+.RB [ \-\-copyright ]
+.RB [ \-\-help ]
+.RB [ \-\-host
+.IR hostname ]
+.RB [ \-\-local ]
+.RB [ \-\-proxy
+.IR proxyport ]
+.RB [ \-\-port
+.IR port ]
+.RB [ \-\-socks
+.RI [ version\fB:\fP ][ username [\fB:\fP password ]\fB@\fP] hostname\fB:\fPport ]
+.RB [ \-\-verbose ]
+.RB [ \-\-version ]
+.RB [ \-\-web\-base 
+.IR url ]
+.SH DESCRIPTION
+.LP
+The Ragnarok MUD has a long-standing history (since the early 1990s) of hosting a built-in
+mapping utility called the \*(lqmagic map\*(rq which shows the locations each player has
+explored so far. The
+.B magicmapper
+program documented here provides a real-time map display during game play. Previous
+versions required the user to periodically download a PostScript or PDF file of their
+map to print or view indepentently.
+.LP
+The
+.B magicmapper
+provides two modes of operation. The default allows the player to use any MUD client
+of their choice, including
+.BR telnet (1),
+using
+.B magicmapper
+as a proxy between the MUD client and the MUD server. In this mode,
+.B magicmapper
+intercepts map content, displaying it in a window it controls, while the rest of the
+MUD session is passed on to the MUD client.
+.LP
+Alternatively,
+.B magicmapper
+may be used in \*(lqlocal\*(rq mode, where it provides its own built-in MUD client rather than an external one,
+so the
+.B magicmapper
+program is the only software needed to play the game.
+.SH OPTIONS
+.LP
+The following options may be specified at the command-line to control the
+operation of the program.  In cases where a short form of the option
+is provided (e.g., 
+.RB \*(lq \-v ,\*(rq)
+it may be combined with other short options in a single argument (i.e.,
+either
+.RB \*(lq \-vl \*(rq
+or
+.RB \*(lq \-v
+.BR \-l \*(rq
+are equivalent), and any value which is supposed to be given for the
+option follows it as a separate argument
+.RB (\*(lq \-p
+.BR 2222 \*(rq)
+or as the remaining text after the option
+.RB (\*(lq \-p2222 \*(rq).
+In the case of long option names, they must be given separately from 
+each other, although values may be given as, for example,
+.RB \*(lq \-\-port=2222 \*(rq
+or
+.RB \*(lq \-\-port
+.BR 2222 \*(rq.
+.TP
+.BR \-C " / " \-\-copyright
+Print the copyright and licensing information and exit.
+.TP
+.BR \-H " / " \-\-host=\fIhostname\fP
+Connect to the MUD server at the given
+.IR hostname .
+The default is
+.BR rag.com .
+.TP
+.BR \-h " / " \-\-help
+Print a short synopsis of the program usage and exit.
+.TP
+.BR \-l " / " \-\-local
+Use the local built-in MUD client rather than acting as proxy for a separate MUD client program.
+.TP
+.BR \-P " / " \-\-port=\fIport\fP
+Connect to the MUD server on the specified TCP
+.IR port .
+The default is
+.BR 2222 .
+.TP
+.BR \-p " / " \-\-proxy=\fIport\fP
+Open a local TCP port on the specified 
+.I port
+number, to accept connection from the external MUD client. The default is
+.BR 2222 .
+.TP
+.BI "\-S \fR/\fP \-\-socks=" \fR[\fPversion : \fR][\fPusername\fR[\fP : password\fR]\fP @\fR]\fP hostname : port
+Connect through the SOCKS proxy at the given
+.I hostname
+and
+.I port
+to make connections with the MUD server and web server. If
+.I version
+is specified, it indicates the version of the SOCKS protocol in use.
+Supported versions are
+.BR 4 ,
+.BR 4a ,
+and
+.BR 5 .
+Version 5 is assumed by default.
+.RS
+.LP
+If a username and password are required to log in to the SOCKS server,
+they may be specified before the
+.I hostname
+as, for example:
+.RS
+.LP
+.B "\-\-socks=alice@proxy.example.org:1080"
+.RE
+or
+.RS
+.B "\-\-socks=alice:mypassword@proxy.example.org:1080"
+.RE
+.RE
+.TP
+.BR \-V " / " \-\-version
+Print the
+.B magicmapper
+version number and exit.
+.TP
+.BR \-v " / " \-\-verbose
+Add extra debugging information on the program's standard output. Specifying this option
+multiple times increases the verbosity.
+.TP
+.BR \-w " / " \-\-web\-base=\fIurl\fP
+Fetch map and image content from the MUD's web server. The URL for this content starts with
+the specified
+.I url
+followed by the specific file structure required by the map content being fetched.
+The default is
+.BR https://www.rag.com/magicmap .
+.SH "PROXY OPERATION"
+.LP
+The default mode of operation for
+.B magicmapper
+is to display maps in a side window while you use a separate MUD client program
+to play the actual game. If you invoke
+.RS
+.LP
+.B "$ magicmapper"
+.RE
+.LP
+with no other options, it will assume it is connecting an external client program to the Ragnarok MUD
+system. Configure your MUD client (telnet, zmud, whatever) to connect to port 2222 of
+.B localhost
+(127.0.0.1) and start it
+.I after
+you start
+.BR magicmapper .
+.LP
+If you wish to use this with a different server, or use a different local port to connect
+your MUD client to, you may arrange this by giving the options documented above.
+.SH "LOCAL OPERATION"
+.LP
+If you wish to use the local MUD client built in to
+.BR magicmapper ,
+just invoke it with the 
+.B \-\-local
+option:
+.RS
+.LP
+.B "$ magicmapper \-\-local"
+.RE
+.LP
+This will open a split-screen window where you can type commands at the bottom while the MUD
+game text continuously scrolls in the upper window.
+.SH "INTERACTIVE USAGE"
+.LP
+Once you start
+.B magicmapper
+and are connected to the MUD through it, the map window will track your
+movement in the game world, adding locations to the graphical map as you
+visit them. The map is hand-crafted by the wizards who created the MUD realms,
+so the appearance will vary from realm to realm.
+.LP
+While in the game, you can control your magicmap with the following 
+commands:
+.TP
+.B "> magicmap start"
+Start tracking your movements on the map. Your current location will appear
+highlighted at the intersection of cross-hairs.
+.TP
+.B "> magicmap stop"
+Stop tracking your movements. Your on-screen map won't update anymore as you
+explore new areas, but your in-game magicmap will continue to remember all the
+places you go, so a future
+.B sync
+command will catch up your local graphical display to include any new areas
+you visited while your map wasn't actively tracking your movements.
+.TP
+.B "> magicmap toggle"
+This turns on or off the map's tracking (as with the
+.B start
+and
+.B stop
+commands), whichever is appropriate to change the tracking from whatever its
+setting is now.
+.TP
+.B "> magicmap sync"
+This commands sends a list of all the areas you've ever visited to your local
+map client. This is helpful the first time you use the
+.B magicmapper
+program on a computer, or if you explored more areas with the location tracking
+turned off. This may take a few minutes to complete. Game play will continue
+while the map is updating in the background.
+.TP
+.B "> magicmap query"
+Reports to you whether or not the map is tracking your movements now.
+.TP
+.B "> examine magicmap"
+Describes the map in game-universe terms, including the number of locations
+your character has visited so far.
+.LP
+While viewing the map, you can hold down the left mouse button and drag the
+map canvas around to scroll the image, or use the scrollbars on the edges of the
+display window.
+.LP
+The 
+.I "view > zoom"
+menu options and keys
+.IR ^+ ,
+.IR ^\- ,
+and
+.IR ^0
+can be used to zoom in, zoom out, and restore original zoom level.
+.LP
+The map will automatically display the map page containing your current
+location, but you can manually flip forward and back in the map's pages
+by pressing the
+.I PgUp
+and 
+.I PgDn
+keys.
+.SH "SEE ALSO"
+.LP
+.BR magicmap (5).
+.SH VERSION
+.LP
+This document describes version 6 (V6) of the Ragnarok Magic Map system.  The
+version numbers of the various public tools are kept in sync with this major
+revision number.  The tool version referenced here is 6.0.
+.SH HISTORY
+.LP
+The
+.B magicmapper
+command first appeared in version 6.0.
+.SH AUTHORS
+.LP
+The magicmapper was originally created by Klive of Ragnarok, then subsequently
+rewritten and enhanced by Fizban, with help from Polyone.
+.SH NOTES
+.LP
+*Names of third-party products are the property of, and may be trademarks or registered
+trademarks belonging to, their respective owners.

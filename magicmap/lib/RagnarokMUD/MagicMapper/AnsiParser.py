@@ -2,7 +2,401 @@
 # vi:set ai sm nu ts=4 sw=4 expandtab:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: ANSI Sequence Parser
-# $Header$
+#
+
+# We emit the following events to the specified queue
+# as the ANSI codes come in to us:
+#0+ $[c1;c2;...;cn;m            AnsiColor           c: color codes
+#2  $[[r];[c]H                  AnsiCursor          row, col default to 1 (top left)
+#1  $[nJ                        AnsiClear
+#1  $[nK                        AnsiClearEOL
+#
+#1  $[>"id"v                    AnsiImage           display image with given id
+#2  $[>s[;"name"]p              AnsiTrack           s: 0=stop, 1=start tracking map for player name
+#5  $[>i;n;[m];[s];"id"s        AnsiUpdateLocation  i: n: m: s: id:
+#1  $[>"id"~                    AnsiCurrentLocation id:
+#3  $[>g;[name[;fmt]]w          AnsiCreateGauge     g: name: fmt:
+#3  $[>g;v;[max]u               AnsiUpdateGauge     g: v: max:
+#1  $[>gx                       AnsiDeleteGauge     g:
+#1  $[>"challenge"}             AnsiAuthChallenge
+#1  $[>[n]q                     AnsiCacheControl    n:
+class AnsiEvent:
+    def __init__(self, raw_bytes):
+        self.raw_bytes = raw_bytes
+
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        return "<<AnsiEvent>>"
+
+class AnsiColor (AnsiEvent):
+    def __init__(self, raw_bytes, *colors):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.foreground = None
+        self.background = None
+        self.bold = None
+        self.underlined = None
+        self.reverse = None
+
+        for color_code in colors:
+            if   color_code == 0: self.reset()
+            elif color_code == 1: self.bold = True
+            elif color_code == 4: self.underlined = True
+            elif color_code == 7: self.reverse = True
+            elif 30 <= color_code <= 37: self.foreground = color_code - 30
+            elif 40 <= color_code <= 47: self.foreground = color_code - 40
+                
+    def reset(self):
+        self.foreground = -1
+        self.background = -1
+        self.bold = False
+        self.underlined = False
+        self.reverse = False
+
+    def apply(self, updates):
+        "Apply the colors in the AnsiColor object <updates> to our current set."
+        #
+        # if their attribute is None, they don't modify our state in that way at
+        # all. If they have an explicit value, they do.
+        # Note that fg/bg color of -1 means to use the terminal's default color.
+        #
+        if updates.foreground is not None: self.foreground = updates.foreground
+        if updates.background is not None: self.background = updates.background
+        if updates.bold is not None: self.bold = updates.bold
+        if updates.underlined is not None: self.underlined = updates.underlined
+        if updates.reverse is not None: self.reverse = updates.reverse
+
+    def __str__(self):
+        return f"<<AnsiColor fg={self.foreground} bg={self.background} bf={self.bold} ul={self.underlined} rv={self.reverse}>>"
+
+class AnsiCursor (AnsiEvent):
+    def __init__(self, raw_bytes, row=1, col=1):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.row = 1 if row is None or row < 1 else row
+        self.col = 1 if col is None or col < 1 else col
+
+    def __str__(self):
+        return f"<<AnsiCursor row={self.row} col={self.col}>>"
+
+class AnsiClear (AnsiEvent):
+    def __init__(self, raw_bytes, mode=0):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.mode = mode or 0
+        # mode is 0=clear from cursor to end of screen
+        #         1=clear from cursor to beginning of screen
+        #         2=clear entire screen
+        #         3=clear entire screen and delete scrollback buffer contents
+
+    def __str__(self):
+        return f"<<AnsiClear mode={self.mode}>>"
+
+class AnsiClearEOL (AnsiEvent):
+    def __init__(self, raw_bytes, mode=0):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.mode = mode or 0
+        # mode is 0=clear from cursor to end of line
+        #         1=clear from cursor to beginning of line
+        #         2=clear entire line
+
+    def __str__(self):
+        return f"<<AnsiClearEOF mode={self.mode}>>"
+
+class AnsiImage (AnsiEvent):
+    def __init__(self, raw_bytes, image_id):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.image_id = image_id
+
+    def __str__(self):
+        return f"<<AnsiImage id={self.image_id}>>"
+
+class AnsiTrack (AnsiEvent):
+    def __init__(self, raw_bytes, state, name=None):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.state = state
+        self.name = name
+        # state 0=stop tracking location
+        #       1=start tracking for player <name>
+
+    def __str__(self):
+        return f"<<AnsiTrack state={self.state} name={self.name}>>"
+        
+class AnsiUpdateLocation (AnsiEvent):
+    def __init__(self, raw_bytes, i, n, modtime, checksum, location_id):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.i = i
+        self.n = n
+        self.modtime = modtime
+        self.checksum = checksum
+        self.location_id = location_id
+
+    def __str__(self):
+        return f"<<AnsiUpdateLocation #{self.i} of {self.n} mod={self.modtime} sha={self.checksum}, id={self.location_id}>>"
+
+class AnsiCurrentLocation (AnsiEvent):
+    def __init__(self, raw_bytes, location_id=None):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.location_id = location_id
+
+    def __str__(self):
+        return f"<<AnsiCurrentLocation id={self.location_id}>>"
+
+class AnsiCreateGauge (AnsiEvent):
+    def __init__(self, raw_bytes, gauge_id, name=None, fmt=None):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.gauge_id = gauge_id
+        self.name = name
+        self.fmt = fmt
+
+    def __str__(self):
+        return f"<<AnsiCreateGauge id={self.gauge_id} name={self.name} fmt={self.fmt}>>"
+    
+class AnsiUpdateGauge (AnsiEvent):
+    def __init__(self, raw_bytes, gauge_id, value, maxvalue=None):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.gauge_id = gauge_id
+        self.value = value
+        self.maxvalue = maxvalue
+
+    def __str__(self):
+        return f"<<AnsiUpdateGauge id={self.gauge_id} value={self.value} max={self.maxvalue}>>"
+
+class AnsiDeleteGauge (AnsiEvent):
+    def __init__(self, raw_bytes, gauge_id):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.gauge_id = gauge_id
+
+    def __str__(self):
+        return f"<<AnsiDeleteGauge id={self.gauge_id}>>"
+
+class AnsiAuthChallenge (AnsiEvent):
+    def __init__(self, raw_bytes, challenge):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.challenge = challenge
+
+    def __str__(self):
+        return f"<<AnsiAuthChallenge {self.challenge}>>"
+
+class AnsiCacheControl (AnsiEvent):
+    def __init__(self, raw_bytes, op):
+        AnsiEvent.__init__(self, raw_bytes)
+        self.op = op or 0
+        # operation op: 0=expire cache
+        #               1=delete cache
+
+    def __str__(self):
+        return f"<<AnsiCacheControl op={self.op}>>"
+
+class AnsiParser:
+    def __init__(self, event_queue=None, client_queue=None, inline_images=True):
+        self.inline_images_enabled = inline_images
+        self.event_queue = event_queue
+        self.client_queue = client_queue
+        self.buffer = b''
+        self.suppressing = False
+
+    def parse(self, s):
+        '''read bytes from s as input, dispatching the text and/or events to the
+        queues set up when the AnsiParser was created. If we're partially through
+        an ANSI sequence that we care about, we'll hold on to it until the next
+        call completes that sequence. Note that the output may include raw ANSI
+        sequences (not necessarily complete) if they aren't ones we're watching for.'''
+
+        if not isinstance(s, bytes):
+            s = bytes(s)
+
+        if self.buffer:
+            s = self.buffer + s
+            self.buffer = b''
+
+        seq_start = s.find(b'\33[')
+
+        while seq_start >=0 :
+            #
+            # First, send all the text up to the start of the
+            # escape sequence, skipping to newline if we've been
+            # asked to suppress the rest of the line.
+            #
+            if not self.suppressing:
+                self.emit_text(s[:seq_start])
+            else:
+                newline = s.find(b'\n', 0, seq_start)
+                if newline >= 0:
+                    self.emit_text(s[newline+1:seq_start])
+                    self.suppressing = False
+            #
+            # Interpret the escape code.
+            # If $[>... then it's probably one of our private ones; let's handle it here
+            # 
+            if len(s) <= seq_start+2:
+                # we already know we don't have enough yet; wait for more
+                self.buffer = s[seq_start:]
+                return
+
+            if chr(s[seq_start+2]) == '>':
+                # special private range $[>...
+                private = True
+                offset = 3
+            else:
+                # common range $[...
+                private = False
+                offset = 2
+
+            parameters = []
+            accumulator = None
+            stringvalue = None
+
+            # 
+            # we aren't required to, but we'll be forgiving enough to
+            # allow adjacent strings and strings adjacent to integers
+            # without the separator, hence '12"foo"34"bar""baz"' would
+            # be the same as '12;"foo";34;"bar";"baz"', although the
+            # latter is preferred.
+            #
+            for i, ch_byte in enumerate(s[seq_start+offset:], start=seq_start+offset):
+                ch = chr(ch_byte)
+                if ch == '"':
+                    # quoted string parameter value
+                    if stringvalue is None:
+                        if accumulator is not None:
+                            parameters.append(accumulator)
+                            accumulator = None
+                        stringvalue = b''
+                    else:
+                        accumulator = stringvalue
+                        stringvalue = None
+
+                elif stringvalue is not None:
+                    stringvalue += bytes((ch_byte,))
+
+                elif ch.isdigit():
+                    if isinstance(accumulator, (bytes, str)):
+                        parameters.append(accumulator)
+                        accumulator=None
+                    accumulator = (0 if accumulator is None else accumulator) * 10 + int(ch)
+
+                elif ch == ';':
+                    # parameter separator, push and reset
+                    # this allows ;; to specify a nil parameter in the list
+                    parameters.append(accumulator)
+                    accumulator = None
+
+                else:
+                    # this terminates the sequence
+                    raw_seq = s[seq_start:i+1]
+                    s = s[i+1:]
+
+                    if private:
+                        if ch == 'p':
+                            self._param_range(parameters, accumulator, 2, 2)
+                            self.emit_event(AnsiTrack(raw_seq, *parameters))
+
+                        elif ch == 'q':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            self.emit_event(AnsiCacheControl(raw_seq, *parameters))
+
+                        elif ch == 's':
+                            self._param_range(parameters, accumulator, 5, 5)
+                            self.emit_event(AnsiUpdateLocation(raw_seq, *parameters))
+
+                        elif ch == 't':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            if parameters[0] == 2:
+                                self.suppressing = self.inline_images_enabled
+                            else:
+                                self.suppressing = bool(parameters[0])
+
+                        elif ch == 'u':
+                            self._param_range(parameters, accumulator, 3, 3)
+                            self.emit_event(AnsiUpdateGauge(raw_seq, *parameters))
+
+                        elif ch == 'v':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            if self.inline_images_enabled:
+                                self.emit_text(AnsiImage(raw_seq, *parameters))
+                            else:
+                                self.emit_event(AnsiImage(raw_seq, *parameters))
+
+                        elif ch == 'w':
+                            self._param_range(parameters, accumulator, 3, 3)
+                            self.emit_event(AnsiCreateGauge(raw_seq, *parameters))
+
+                        elif ch == 'x':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            self.emit_event(AnsiDeleteGauge(raw_seq, *parameters))
+
+                        elif ch == '~':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            self.emit_event(AnsiCurrentLocation(raw_seq, *parameters))
+
+                        elif ch == '}':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            self.emit_event(AnsiAuthChallenge(raw_seq, *parameters))
+
+                        else:
+                            #
+                            # Oh... this isn't one of our escape codes after all.
+                            # in that case, pass it on through.
+                            #
+                            self.emit_text(raw_seq)
+                    else:
+                        if ch == 'm':
+                            self._param_range(parameters, accumulator, 0)
+                            self.emit_text(AnsiColor(raw_seq, *parameters))
+                        elif ch == 'H':
+                            self._param_range(parameters, accumulator, 2, 2)
+                            self.emit_text(AnsiCursor(raw_seq, *parameters))
+                        elif ch == 'J':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            self.emit_text(AnsiClear(raw_seq, *parameters))
+                        elif ch == 'K':
+                            self._param_range(parameters, accumulator, 1, 1)
+                            self.emit_text(AnsiClearEOL(raw_seq, *parameters))
+                        else:
+                            self.emit_text(raw_seq)
+                    break
+            else:
+                # We ran out of string before the sequence was finished!
+                self.buffer = s[seq_start:]
+                return
+
+            # look for another sequence after this
+            seq_start = s.find(b'\33[')
+        #
+        # we've handled everything up to and including the last
+        # complete escape sequence now; ship out any remaining text.
+        #
+        if s:
+            self.emit_text(s)
+
+    def emit_text(self, thing):
+        print(f'text: {thing}')
+        if self.client_queue:
+            if isinstance(thing, str):
+                self.client_queue.put(bytes(thing))
+            elif isinstance(thing, bytes):
+                self.client_queue.put(thing)
+            elif isinstance(thing, AnsiEvent):
+                self.client_queue.put(thing.raw_bytes)
+        elif self.event_queue:
+            self.event_queue.put(thing)
+
+    def emit_event(self, thing):
+        print(f'event: {thing}')
+        if self.event_queue:
+            self.event_queue.put(thing)
+
+    def _param_range(self, parameters, accumulator=None, min=1, max=None):
+        "Commit accumulator and ensure parameters within required bounds"
+        if accumulator is not None:
+            parameters.append(accumulator)
+            accumulator = None
+
+        while len(parameters) < min:
+            parameters.append(None)
+
+        if max is not None and len(parameters) > max:
+            del parameters[max:]
 #
 # Copyright (c) 2012 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
@@ -22,233 +416,3 @@
 # safety of any person, animal, or property depends upon, or is at
 # risk of any kind from, the correct operation of this software.
 #
-
-class IncompleteSequence (Exception): pass
-
-class AnsiParser (object):
-    def __init__(self, target_viewer=None):
-        self.inline_images_enabled = True
-        self.target_viewer = target_viewer
-
-    def filter(self, s):
-        '''filter out our ANSI sequences from s and act on them.
-        returns s without those sequences.  The result may include
-        other ANSI sequences we weren't looking for.'''
-
-        filtered_text = []
-        suppressing = False
-        stringvalue = None
-
-        # multiline: wrap in split/join on newlines
-        # We only care about $[> sequences
-        remainder = 0
-        i = s.find('\33[>')
-
-        while i >=0 :
-            if not suppressing:
-                filtered_text.append(s[remainder:i])
-            else:
-                newline = s.find('\n', remainder, i)
-                if newline >= 0:
-                    filtered_text.append(s[newline+1:i])
-
-            parameters = []
-            accumulator = None
-            #
-            # Scan sequence up to unquoted non-numeric character
-            # which terminates the sequence.  Ours are in the private
-            # range p..~  (we implement p,s,t,u,v,w,x,~ so far)
-            #
-            # parameters are separated by ';' and must be either numeric
-            # or double-quoted strings.  They may be completely empty.
-            # 
-            # we aren't required to, but we'll be forgiving enough to
-            # allow adjacent strings and strings adjacent to integers
-            # without the separator, hence '12"foo"34"bar""baz"' would
-            # be the same as '12;"foo";34;"bar";"baz"', although the
-            # latter is preferred.
-            #
-            # id;"name";"fmt" w     create gauge
-            # id;v;max u            update gauge value
-            # id x                  delete gauge
-            # 1;"name" p            start tracking map for <name>
-            # 0p                    stop tracking map
-            # "id" ~                player location update
-            # i;n;[m];[s];id s      force (re)load of map room from server
-            # 1t                    suppress output to \n
-            # 2t                    ditto but only if we're displaying in-line images
-            # 0t                    stop suppression
-            # "id" v                display inline image
-            #
-            for i, ch in enumerate(s[i+3:], start=i+3):
-                if ch == '"':
-                    # quoted string parameter value
-                    if stringvalue is None:
-                        if accumulator is not None:
-                            parameters.append(accumulator)
-                            accumulator = None
-                        stringvalue = []
-                    else:
-                        accumulator = ''.join(stringvalue)
-                        stringvalue = None
-
-                elif stringvalue is not None:
-                    stringvalue.append(ch)
-
-                elif ch.isdigit():
-                    if isinstance(accumulator, str):
-                        parameters.append(accumulator)
-                        accumulator=None
-                    accumulator = (0 if accumulator is None else accumulator) * 10 + int(ch)
-
-                elif ch == ';':
-                    # parameter separator, push and reset
-                    parameters.append(accumulator)
-                    accumulator = None
-
-                elif ch == 'p':
-                    # map tracking control
-                    self._param_range(parameters, accumulator, 2)
-
-                    if not parameters[0]:
-                        self.handle_tracking_stop()
-                    else:
-                        self.handle_tracking_start(parameters[1])
-                    break
-
-                elif ch == 'q':
-                    # debugging support
-                    self._param_range(parameters, accumulator)
-                    self.handle_debug(parameters)
-                    break
-
-                elif ch == 's':
-                    # i;n;[m];[s];id s      force (re)load of map room from server
-                    self._param_range(parameters, accumulator, 5, 5)
-                    self.handle_location_sync(*parameters)
-                    break
-
-                elif ch == 't':
-                    self._param_range(parameters, accumulator, 1, 1)
-                    if parameters[0] == 2:
-                        suppressing = self.inline_images_enabled
-                    else:
-                        suppressing = bool(parameters[0])
-                    break
-
-                elif ch == 'u':
-                    # update gauge
-                    self._param_range(parameters, accumulator, 3, 3)
-                    self.handle_gauge_update(*parameters)
-                    break
-
-                elif ch == 'v':
-                    # display in-line image
-                    self._param_range(parameters, accumulator, 1, 1)
-                    if parameters[0] and self.inline_images_enabled:
-                        self.handle_image(parameters[0])
-                    break
-
-                elif ch == 'w':
-                    # create gauge
-                    self._param_range(parameters, accumulator, 2, 3)
-                    self.handle_gauge_create(*parameters)
-                    break
-
-                elif ch == 'x':
-                    # delete gauge
-                    self._param_range(parameters, accumulator, 1, 1)
-                    self.handle_gauge_destroy(parameters[0])
-                    break
-
-                elif ch == '~':
-                    # update position on map
-                    self._param_range(parameters, accumulator, 1, 1)
-                    if parameters[0]:
-                        self.handle_tracking_position(parameters[0])
-                    else:
-                        self.handle_tracking_position(None) # We don't know where we are
-                    break
-
-                else:
-                    # invalid private sequence detected if we reach here.
-                    # We'll just ignore the sequence and go on.
-                    # XXX log it!
-                    self._param_range(parameters, accumulator, 0)
-                    filtered_text.append('\33[>' + ';'.join([
-                        '"' + x + '"' if isinstance(x, str) else str(x)
-                        for x in parameters
-                    ]) + ch)
-                    break
-            else:
-                # we reached the end of the string w/o terminating the sequence!
-                raise IncompleteSequence('End of input received before sequence was complete')
-
-            remainder = i+1
-            i = s.find('\33[>', remainder)
-
-        result = ''.join(filtered_text)
-        if not suppressing:
-            return result + s[remainder:]
-        else:
-            newline = s.find('\n', remainder)
-            if newline >= 0:
-                return result + s[newline+1:]
-            else:
-                return result
-
-    def _param_range(self, parameters, accumulator=None, min=1, max=None):
-        if accumulator is not None:
-            parameters.append(accumulator)
-            accumulator = None
-
-        while len(parameters) < min:
-            parameters.append(None)
-
-        if max is not None and len(parameters) > max:
-            # XXX log error!
-            del parameters[max:]
-
-    # external interfaces.  We want to trap exceptions here
-    # and report them out, so they don't stop everything else
-    # going on.  None of these should be fatal.
-
-    def trapErrors(f):
-        def wrapper(self, *args, **kw):
-            try:
-                f(self, *args, **kw)
-            except Exception as err:
-                print("XXX Error in {} call: {}".format(
-                        f.__name__, err))
-        return wrapper
-
-    @trapErrors
-    def handle_tracking_start(self, player_name):
-        if self.target_viewer:
-            self.target_viewer.tracking_start(player_name)
-
-    @trapErrors
-    def handle_tracking_stop(self):
-        if self.target_viewer:
-            self.target_viewer.tracking_stop()
-
-    @trapErrors
-    def handle_tracking_position(self, id=None):
-        print("XXX handle_tracking_position(id={})".format(id))
-        if self.target_viewer:
-            self.target_viewer.tracking_position(id)
-
-    @trapErrors
-    def handle_location_sync(self, i, total, modtime, checksum, id):
-        if self.target_viewer:
-            self.target_viewer.tracking_sync(i, total, modtime, checksum, id)
-
-    def handle_gauge_create(self, id, name, fmt): pass
-    def handle_gauge_update(self): pass
-    def handle_gauge_destroy(self): pass
-    def handle_image(self, id):
-        print("XXX display inline image {}".format(id))
-
-    def handle_debug(self):
-        # in the production code, we don't.
-        pass

@@ -1,30 +1,6 @@
 # vi:set ai sm nu ts=4 sw=4 expandtab:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: Network I/O Handler
-# $Header$
-#
-# Copyright (c) 2010, 2015 by Steven L. Willoughby, Aloha, Oregon, USA.
-# All Rights Reserved.  Licensed under the Open Software License
-# version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
-# for details.
-#
-# Based on earlier code from the Ragnarok MudShell (MSH) client,
-# Copyright (c) 1993, 2000, 2001, 2002, 2003 by Steven L. Willoughby,
-# Aloha, Oregon, USA.  All Rights Reserved.  MSH is licensed under
-# the terms of the GNU General Public License (GPL) version 2.
-#
-# This product is provided for educational, experimental or personal
-# interest use, in accordance with the terms and conditions of the
-# aforementioned license agreement, ON AN "AS IS" BASIS AND WITHOUT
-# WARRANTY, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION,
-# THE WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A
-# PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY OF THE ORIGINAL
-# WORK IS WITH YOU.  (See the license agreement for full details,
-# including disclaimer of warranty and limitation of liability.)
-#
-# Under no curcumstances is this product intended to be used where the
-# safety of any person, animal, or property depends upon, or is at
-# risk of any kind from, the correct operation of this software.
 #
 
 #from RagnarokMUD.MagicMapper.MapSource      import MapSource, MapFileFormatError
@@ -33,17 +9,74 @@
 #from RagnarokMUD.MagicMapper.MapDataHandler import MapDataHandler
 #from RagnarokMUD.MagicMapper.Local          import gen_public_room_id
 #import os, os.path, datetime
-if __name__ == '__main__':
-    import sys
-    sys.path.append('../..')
+
+
+#
+# For proxied connections
+# ProxyService(remote_hostname='rag.com', report_port=2222, local_hostname='localhost', local_port=2222, target_viewer=None)
+#   the target_viewer targets the AnsiParser to send events
+#   to as they're parsed. Calls
+#       .tracking_start(player_name)
+#       .tracking_stop()
+#       .tracking_position(id)
+#       .tracking_sync(i, total, modtime, checksum, id)
+#
+# .set_socks_proxy(version, server, port, username=None, password=None)
+# ._negotiate_with_socks_proxy()
+#      ->._grab_bytes(size) 
+# .close_local_port()
+# .open_local_port()
+# .poll()       call as idle task to process more I/O
+#       incoming connection to local port
+#           telnetlib.Telnet()
+#               sets .handle_telnet_option() to take telnet options
+#           ->._negotiatite_with_socks_proxy() if one is set
+#       data from mud client
+#           grab up to 1k of data
+#           look for FFxxyy bytes; filter them out of the stream
+#           write to server
+#       socket error
+#           disconnect
+#       try reading from server -> data=ansi_parser.filter(data)
+#           will wait for complete ANSI sequence to be received
+#           if any (non-ANSI) data left, send to client
+#
+# .hangup()  (tells client that server hungup)
+# .handle_telnet_option(socket, command, option)
+#       if server says WILL ECHO
+#           set .echo false
+#           send IAC WILL ECHO to client
+#       if server says WONT ECHO
+#           set .echo true
+#           send IAC WONT ECHO to client
+#       if server says DO echo
+#           set .echo true
+#           send IAC DO ECHO to client
+#       if server says DONT echo
+#           set .echo false
+#           send IAC DONT ECHO to client
+#       so the .echo attribute tells us if we should be echoing the user's
+#       input.
+#
+# NEW:
+#   no need for poll() function anymore
+#
+#   .run()
+#       start threaded handling of communication.
+#   .stop()
+#       shut down communications and stop the running threads.
+#       blocks until threads are finished working.
+
 
 from RagnarokMUD.MagicMapper.MapCacheManager import MapCacheManager
-from RagnarokMUD.MagicMapper.AnsiParser      import AnsiParser, IncompleteSequence
+from RagnarokMUD.MagicMapper.AnsiParser      import AnsiParser
 import urllib.request, urllib.error, urllib.parse
 import time
 import select
 import socket
 import telnetlib
+import queue
+import threading
 
 def tiny_hexdump(data):
     if data is None:
@@ -253,7 +286,7 @@ class ConnectionFailed (Exception): pass
 class LocalProxyFailed (Exception): pass
 
 class ProxyService (object):
-    def __init__(self, remote_hostname='rag.com', remote_port=2222, local_hostname='localhost', local_port=2222, target_viewer=None):
+    def __init__(self, remote_hostname='rag.com', remote_port=2222, local_hostname='localhost', local_port=2222, event_queue=None, client_queue=None):
         self.local_hostname  = local_hostname
         self.local_port      = local_port
         self.remote_hostname = remote_hostname
@@ -262,8 +295,6 @@ class ProxyService (object):
         self.mud_client      = None
         self.mud_server      = None
         self.echo            = True
-        self.open_local_port()
-        self.ansi_parser     = AnsiParser(target_viewer=target_viewer)
         self._client_hold_data = ''
         self._server_hold_data = ''
         self.socks_server    = None
@@ -271,6 +302,17 @@ class ProxyService (object):
         self.socks_version   = None
         self.socks_username  = None
         self.socks_password  = None
+        self.event_queue = event_queue
+        self.client_queue = client_queue
+
+        self.manager_thread = None
+        self.local_read_thread = None
+        self.local_write_thread = None
+        self.remote_read_thread = None
+        self.remote_write_thread = None
+
+        self.local_sender = None
+        self.remote_sender = None
 
     #
     # My own quick and dirty code to negotiate with a SOCKS proxy
@@ -466,18 +508,135 @@ class ProxyService (object):
             self._socks_recv += self.mud_server.rawq_getchar()
         print("XXX Read {} from source: {}".format(len(self._socks_recv), tiny_hexdump(self._socks_recv)))
 
+    def run(self):
+        "Start communications with the world. Launches threads to handle I/O."
+        #
+        # This opens our local proxy and (when a client connects to it) an outbound connection to
+        # the MUD server. We launch threads:
+        #   * accept incoming connections from local side
+        #       when connected, connect to remote and launch other threads:
+        #          * read data from local side
+        #          * read data from remote side
+        #          * write data to local side
+        #          * write data to remote side
+        #       wait for connection to drop; join threads and wait for another connection
+        #
+        if self.manager_thread:
+            print("Asked to run() proxy service while already running! Stopping the old one first...")
+            self.stop()
 
-    def close_local_port(self):
+        self.local_sender = queue.Queue()
+        self.remote_sender = queue.Queue()
+
+        self.manager_thread = threading.Thread(target=self._manage_threads)
+        self.manager_thread.start()
+
+    def _manage_threads(self):
+        "(run in a separate thread) waits for incoming connection, then spawns worker threads to talk to it."
+        self._open_local_port()
+        while True:
+            print("Ready for local connection")
+            self.mud_client, self.mud_client_address = self.local_socket.accept()
+            print(f"Connection from {self.mud_client_address} to magicmap... proxying to {self.remote_hostname}, {self.remote_port}")
+            try:
+                if self.socks_version is not None:
+                    self.mud_server = socket.create_connection((self.socks_server, self.socks_port))
+                    self.mud_server.setblocking(True)
+                    self._negotiate_with_socks_proxy()
+                else:
+                    self.mud_server = socket.create_connection((self.remote_hostname, self.remote_port))
+                    self.mud_server.setblocking(True)
+            except Exception as err:
+                print(f'Connection to MUD {self.remote_hostname}, port {self.remote_port} error: {err}')
+                self.mud_client.sendall(f'Connection to MUD {self.remote_hostname}, port {self.remote_port} error: {err}')
+                self.mud_client.close()
+                self.mud_client = None
+                self.mud_server = None
+                continue
+
+            print(f'Connected to remote server.')
+            self.local_read_thread = threading.Thread(target=self._input_pipe, args=(self.mud_client, self.remote_sender))
+            self.remote_write_thread = threading.Thread(target=self._output_pipe, args=(self.mud_server, self.remote_sender))
+
+            self.local_write_thread = threading.Thread(target=self._output_pipe, args=(self.mud_client, self.local_sender))
+            self.remote_read_thread = threading.Thread(target=self._input_parser, args=(self.mud_server, self.local_sender))
+        
+            self.local_read_thread.start()
+            self.local_write_thread.start()
+            self.remote_read_thread.start()
+            self.remote_write_thread.start()
+            print('Set up I/O threads.')
+
+            #
+            # wait for the threads to stop, which they'll do
+            # when they can't talk anymore on their sockets
+            #
+            self.remote_read_thread.join()
+            self.remote_read_thread = None
+            print('Stopped remote receiver.')
+            self._stop_io_threads()
+            self.remote_write_thread.join()
+            self.remote_write_thread = None
+            print('Stopped remote sender.')
+            self.local_read_thread.join()
+            self.local_read_thread = None
+            print('Stopped local receiver.')
+            self.local_write_thread.join()
+            self.local_write_thread = None
+            print('Stopped local sender.')
+
+        self._close_local_port()
+
+    def _stop_io_threads(self):
+        #
+        # violate the conditions upon which the I/O threads
+        # need to keep running. This should make them give up
+        # and stop.
+        #
+        if self.mud_client:
+            self.mud_client.shutdown(socket.SHUT_RDWR)
+            self.mud_client.close()
+            self.mud_client = None
+        if self.mud_server:
+            self.mud_server.shutdown(socket.SHUT_RDWR)
+            self.mud_server.close()
+            self.mud_server = None
+        if self.local_sender:
+            self.local_sender.put(b'')
+        if self.remote_sender:
+            self.remote_sender.put(b'')
+
+    def stop(self):
+        "Stop communications with the world. Stops I/O threads (blocks until they finish)."
+        #
+        # Tell our manager thread to stop accepting any more incoming connections.
+        # Close sockets, wait for threads to terminate
+        #
+        if self.manager_thread:
+            if self.mud_client:
+                self.mud_client.close()
+            if self.mud_server:
+                self.mud_server.close()
+            self.manager_thread.join()
+
+        self.mud_client = None
+        self.mud_server = None
+        self.manager_thread = None
+        self.local_sender = None
+        self.remote_sender = None
+
+
+    def _close_local_port(self):
         "Close the incoming local proxy port"
 
         if self.local_socket:
             self.local_socket.close()
             self.local_socket = None
 
-    def open_local_port(self):
+    def _open_local_port(self):
         "Open the incoming local proxy port"
 
-        self.close_local_port()
+        self._close_local_port()
 
         for family, socktype, protocol, name, sa in socket.getaddrinfo(
                 self.local_hostname, self.local_port, socket.AF_UNSPEC,
@@ -502,154 +661,237 @@ class ProxyService (object):
         print("Opened local proxy {} on {}:{} ({})".format(self.local_socket, self.local_hostname, self.local_port, sa))
         
 
-    def poll(self):
-        "See if there's work to do, and carry it out.  This should be called as an idle task."
+    def _input_pipe(self, sock, q):
+        print("input pipe started")
+        try:
+            while True:
+                print("input pipe trying to read")
+                data = sock.recv(4096)
+                print(f"input pipe read {len(data)}")
+                if not data:
+                    print('EOF on input pipe')
+                    break
+                q.put(data)
+        except Exception as err:
+            print(f"Terminating _output_pipe on errror {err}")
+            return
 
-        # We don't really care about blocking on writes (at this point),
-        # but we need a way to quickly check to see if we have incoming
-        # data to move on to its destination.
-
-        f_list = [_f for _f in [self.local_socket, self.mud_client] if _f]
-        if f_list:
-            reads, writes, errors = select.select(f_list, [], [], 0)
-
-            if self.local_socket in reads:
-                # Someone's knocking on my door... better let them in
-                # XXX log connection from client
-                if self.mud_client:
-                    # One's company, two's a crowd.  We don't want to be mapping for
-                    # more than one player at a time.
-                    connection, address = self.local_socket.accept()
-                    connection.send("Sorry, there is already a client connected to the Magic Mapper.\r\n")
-                    connection.close()
-                    print("XXX Connection refused to {} (too many clients)".format(address))
-                else:
-                    self.mud_client, self.mud_client_address = self.local_socket.accept()
-                    # XXX log connection
-                    print("XXX Connection from {} to magicmap... proxying to {}:{}".format(
-                            self.mud_client_address, self.remote_hostname, self.remote_port))
-                    try:
-                        if self.socks_version is not None:
-                            self.mud_server = telnetlib.Telnet(self.socks_server, self.socks_port, 30)
-                            #self.mud_server.set_debuglevel(10)
-                            self.mud_server.set_option_negotiation_callback(self.handle_telnet_option)
-                            self._negotiate_with_socks_proxy()
-                        else:
-                            self.mud_server = telnetlib.Telnet(self.remote_hostname, self.remote_port, 30)
-                            self.mud_server.set_option_negotiation_callback(self.handle_telnet_option)
-                        print("XXX Connected to MUD {}, port {}".format(self.remote_hostname, self.remote_port))
-                    except Exception as err:
-                        print('Connection to MUD {}, port {} error: {}\r\n'.format(
-                                self.remote_hostname, self.remote_port, err))
-                        self.mud_client.send(
-                                'Connection to MUD {}, port {} error: {}\r\n'.format(
-                                self.remote_hostname, self.remote_port, err))
-                        self.mud_client.close()
-                        self.mud_client = None
-                        self.mud_server = None
-
-            if self.mud_client in reads:
-                # Hark! The user has typed a command!
-                try:
-                    data = self._client_hold_data + self.mud_client.recv(1024)
-                    self._client_hold_data = ''
-                    pos = data.find('\xff')
-                    while pos >= 0:
-                        if len(data) < pos+3:
-                            print("XXX Telnet protocol bytes incomplete; wating for more from client...")
-                            self._client_hold_data = data
-                            data = None
-                            return
-
-                        print("XXX Ignoring Telnet protocol bytes {:02x}{:02x}{:02x}".format(
-                                ord(data[pos]), ord(data[pos+1]), ord(data[pos+2])))
-                        data = data[:pos] + data[pos+3:]
-                        pos = data.find('\xff')
-
-                    if self.echo:
-                        print("XXX received", len(data), "from client:", tiny_hexdump(data))
-                    else:
-                        print("XXX received", len(data), "from client: [not shown]")
-                    self.mud_server.write(data)
-
-                except socket.error:
-                    # On second thought, they rang just to say they hung up on us.
-                    # That's not very nice
-                    # XXX log disconnect
-                    print("XXX client disconnected from proxy.")
-                    if self.mud_client:
-                        self.mud_client.close()
-                        self.mud_client = None
-                    if self.mud_server:
-                        self.mud_server.close()
-                        self.mud_server = None
-
-        
-        # non-blocking attempt to read from the MUD game
-        if self.mud_server:
-            try:
-                data = self._server_hold_data + self.mud_server.read_very_eager()
-                self._server_hold_data = ''
-                data = self.ansi_parser.filter(data)
-            except EOFError:
-                print("XXX MUD disconnected.")
-                self.hangup()
-                data = None
-            except IncompleteSequence:
-                print("XXX Incomplete ANSI sequence received.  Saving {} for later.".format(data))
-                self._server_hold_data = data
-                data = None
-
-            if data:
-                self.mud_client.sendall(data)
-
-    def hangup(self):
-        print("XXX severing connection to MUD.")
-        self.mud_server = None
-        if self.mud_client:
-            self.mud_client.sendall("MUD Server closed the connection.\r\n")
-            self.mud_client.close()
-            self.mud_client = None
+    def _output_pipe(self, sock, q):
+        try:
+            while True:
+                sock.sendall(q.get())
+        except Exception as err:
+            print(f"Terminating _output_pipe on errror {err}")
+            return
 
 
-    def handle_telnet_option(self, socket, command, option):
-        # command: telnetlib.WILL|WONT
-        # option: telnetlib.ECHO
-        if option == telnetlib.ECHO:
-            if command == telnetlib.WILL:
-                # server is (lying about) saying it will echo stuff
-                self.echo = False
-                if self.mud_client:
-                    self.mud_client.sendall(telnetlib.IAC+telnetlib.WILL+telnetlib.ECHO)
-                print("XXX turning echo off")
+    def _input_parser(self, sock, q):
+        WILL = 0xfb
+        WONT = 0xfc
+        DO = 0xfd
+        DONT = 0xfe
+        IAC = 0xff
+        ECHO = 0x01
+        WILL_ECHO = bytes((WILL, ECHO))
+        WONT_ECHO = bytes((WONT, ECHO))
+        DO_ECHO = bytes((DO, ECHO))
+        DONT_ECHO = bytes((DONT, ECHO))
+        ansi_parser = AnsiParser(event_queue = self.event_queue, client_queue = q)
 
-            elif command == telnetlib.WONT:
-                # server is saying it won't echo, so we have to
-                self.echo = True
-                if self.mud_client:
-                    self.mud_client.sendall(telnetlib.IAC+telnetlib.WONT+telnetlib.ECHO)
-                print("XXX turning echo on")
-            elif command == telnetlib.DO:
-                # server is asking US to echo now?  okay...
-                self.echo = True
-                if self.mud_client:
-                    self.mud_client.sendall(telnetlib.IAC+telnetlib.DO+telnetlib.ECHO)
-                print("XXX turning echo on")
-            elif command == telnetlib.DONT:
-                # server is asking US to NOT echo.
-                self.echo = False
-                if self.mud_client:
-                    self.mud_client.sendall(telnetlib.IAC+telnetlib.DONT+telnetlib.ECHO)
-                print("XXX turning echo off")
-            else:
-                print("XXX unknown echo command {}".format(command))
-        else:
-            print("XXX unknown telnet protocol option setting {}.{}".format(command, option))
+        data = b''
+        try:
+            while True:
+                new_data = sock.recv(4096)
+                if not new_data:
+                    print('EOF reading input')
+                    break
+                data += new_data
+                # look for control sequence in data stream
+                telnet_cmd = data.find(IAC)
+                while telnet_cmd >= 0:
+                    ansi_parser.parse(data[:telnet_cmd])
+                    data = data[telnet_cmd:]
+                    if len(data) < 3:
+                        break
+                    if data[1:3] == WILL_ECHO or data[1:3] == DONT_ECHO:
+                        print("*** TURN OFF ECHO ***")
+                    elif data[1:3] == WONT_ECHO or data[1:3] == DO_ECHO:
+                        print("*** TURN ON ECHO ***")
+                    q.put(data[0:3])
+                    data = data[3:]
+                    telnet_cmd = data.find(IAC)
+                if len(data) > 0:
+                    ansi_parser.parse(data)
+                    data = b''
+        except Exception as err:
+            print(f"Terminating _output_pipe on errror {err}")
+            return
+
+#    def poll(self):
+#        "See if there's work to do, and carry it out.  This should be called as an idle task."
+#
+#        # We don't really care about blocking on writes (at this point),
+#        # but we need a way to quickly check to see if we have incoming
+#        # data to move on to its destination.
+#
+#        f_list = [_f for _f in [self.local_socket, self.mud_client] if _f]
+#        if f_list:
+#            reads, writes, errors = select.select(f_list, [], [], 0)
+#
+#            if self.local_socket in reads:
+#                # Someone's knocking on my door... better let them in
+#                # XXX log connection from client
+#                if self.mud_client:
+#                    # One's company, two's a crowd.  We don't want to be mapping for
+#                    # more than one player at a time.
+#                    connection, address = self.local_socket.accept()
+#                    connection.send("Sorry, there is already a client connected to the Magic Mapper.\r\n")
+#                    connection.close()
+#                    print("XXX Connection refused to {} (too many clients)".format(address))
+#                else:
+#                    self.mud_client, self.mud_client_address = self.local_socket.accept()
+#                    # XXX log connection
+#                    print("XXX Connection from {} to magicmap... proxying to {}:{}".format(
+#                            self.mud_client_address, self.remote_hostname, self.remote_port))
+#                    try:
+#                        if self.socks_version is not None:
+#                            self.mud_server = telnetlib.Telnet(self.socks_server, self.socks_port, 30)
+#                            #self.mud_server.set_debuglevel(10)
+#                            self.mud_server.set_option_negotiation_callback(self.handle_telnet_option)
+#                            self._negotiate_with_socks_proxy()
+#                        else:
+#                            self.mud_server = telnetlib.Telnet(self.remote_hostname, self.remote_port, 30)
+#                            self.mud_server.set_option_negotiation_callback(self.handle_telnet_option)
+#                        print("XXX Connected to MUD {}, port {}".format(self.remote_hostname, self.remote_port))
+#                    except Exception as err:
+#                        print('Connection to MUD {}, port {} error: {}\r\n'.format(
+#                                self.remote_hostname, self.remote_port, err))
+#                        self.mud_client.send(
+#                                'Connection to MUD {}, port {} error: {}\r\n'.format(
+#                                self.remote_hostname, self.remote_port, err))
+#                        self.mud_client.close()
+#                        self.mud_client = None
+#                        self.mud_server = None
+#
+#            if self.mud_client in reads:
+#                # Hark! The user has typed a command!
+#                try:
+#                    data = self._client_hold_data + self.mud_client.recv(1024)
+#                    self._client_hold_data = ''
+#                    pos = data.find('\xff')
+#                    while pos >= 0:
+#                        if len(data) < pos+3:
+#                            print("XXX Telnet protocol bytes incomplete; wating for more from client...")
+#                            self._client_hold_data = data
+#                            data = None
+#                            return
+#
+#                        print("XXX Ignoring Telnet protocol bytes {:02x}{:02x}{:02x}".format(
+#                                ord(data[pos]), ord(data[pos+1]), ord(data[pos+2])))
+#                        data = data[:pos] + data[pos+3:]
+#                        pos = data.find('\xff')
+#
+#                    if self.echo:
+#                        print("XXX received", len(data), "from client:", tiny_hexdump(data))
+#                    else:
+#                        print("XXX received", len(data), "from client: [not shown]")
+#                    self.mud_server.write(data)
+#
+#                except socket.error:
+#                    # On second thought, they rang just to say they hung up on us.
+#                    # That's not very nice
+#                    # XXX log disconnect
+#                    print("XXX client disconnected from proxy.")
+#                    if self.mud_client:
+#                        self.mud_client.close()
+#                        self.mud_client = None
+#                    if self.mud_server:
+#                        self.mud_server.close()
+#                        self.mud_server = None
+#
+#        
+#        # non-blocking attempt to read from the MUD game
+#        if self.mud_server:
+#            try:
+#                data = self._server_hold_data + self.mud_server.read_very_eager()
+#                self._server_hold_data = ''
+#                data = self.ansi_parser.filter(data)
+#            except EOFError:
+#                print("XXX MUD disconnected.")
+#                self.hangup()
+#                data = None
+#            except IncompleteSequence:
+#                print("XXX Incomplete ANSI sequence received.  Saving {} for later.".format(data))
+#                self._server_hold_data = data
+#                data = None
+#
+#            if data:
+#                self.mud_client.sendall(data)
+#
+#    def hangup(self):
+#        print("XXX severing connection to MUD.")
+#        self.mud_server = None
+#        if self.mud_client:
+#            self.mud_client.sendall("MUD Server closed the connection.\r\n")
+#            self.mud_client.close()
+#            self.mud_client = None
+#
+
+#    def handle_telnet_option(self, socket, command, option):
+#        # command: telnetlib.WILL|WONT
+#        # option: telnetlib.ECHO
+#        if option == telnetlib.ECHO:
+#            if command == telnetlib.WILL:
+#                # server is (lying about) saying it will echo stuff
+#                self.echo = False
+#                if self.mud_client:
+#                    self.mud_client.sendall(telnetlib.IAC+telnetlib.WILL+telnetlib.ECHO)
+#                print("XXX turning echo off")
+#
+#            elif command == telnetlib.WONT:
+#                # server is saying it won't echo, so we have to
+#                self.echo = True
+#                if self.mud_client:
+#                    self.mud_client.sendall(telnetlib.IAC+telnetlib.WONT+telnetlib.ECHO)
+#                print("XXX turning echo on")
+#            elif command == telnetlib.DO:
+#                # server is asking US to echo now?  okay...
+#                self.echo = True
+#                if self.mud_client:
+#                    self.mud_client.sendall(telnetlib.IAC+telnetlib.DO+telnetlib.ECHO)
+#                print("XXX turning echo on")
+#            elif command == telnetlib.DONT:
+#                # server is asking US to NOT echo.
+#                self.echo = False
+#                if self.mud_client:
+#                    self.mud_client.sendall(telnetlib.IAC+telnetlib.DONT+telnetlib.ECHO)
+#                print("XXX turning echo off")
+#            else:
+#                print("XXX unknown echo command {}".format(command))
+#        else:
+#            print("XXX unknown telnet protocol option setting {}.{}".format(command, option))
 
 
-
-if __name__ == '__main__':
-    # start standalone proxy for testing
-    p = ProxyService(remote_port=2222)
-    while True:
-        p.poll()
+# Copyright (c) 2010, 2015 by Steven L. Willoughby, Aloha, Oregon, USA.
+# All Rights Reserved.  Licensed under the Open Software License
+# version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
+# for details.
+#
+# Based on earlier code from the Ragnarok MudShell (MSH) client,
+# Copyright (c) 1993, 2000, 2001, 2002, 2003 by Steven L. Willoughby,
+# Aloha, Oregon, USA.  All Rights Reserved.  MSH is licensed under
+# the terms of the GNU General Public License (GPL) version 2.
+#
+# This product is provided for educational, experimental or personal
+# interest use, in accordance with the terms and conditions of the
+# aforementioned license agreement, ON AN "AS IS" BASIS AND WITHOUT
+# WARRANTY, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION,
+# THE WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A
+# PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY OF THE ORIGINAL
+# WORK IS WITH YOU.  (See the license agreement for full details,
+# including disclaimer of warranty and limitation of liability.)
+#
+# Under no curcumstances is this product intended to be used where the
+# safety of any person, animal, or property depends upon, or is at
+# risk of any kind from, the correct operation of this software.
+#

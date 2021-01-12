@@ -31,6 +31,7 @@ import sys
 import os, os.path
 import argparse
 import platform
+import queue
 import tkinter as tk
 from tkinter import ttk
 
@@ -45,19 +46,20 @@ config = ConfigurationManager()
 config.save_first()
 
 from RagnarokMUD.MagicMapper.GUI.BasicDialogs     import display_splash_screen
-from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapPreviewFrame
+from RagnarokMUD.MagicMapper.GUI.MapViewerFrame   import MapClientFrame
+from RagnarokMUD.MagicMapper.NetworkIO            import ProxyService
 
-op = argparse.ArgumentParser(usage='%prog [-ChlVv] [-H hostname] [-P port] [-p proxyport] [-w url]')
+op = argparse.ArgumentParser(usage='%(prog)s [-ChlVv] [-H hostname] [-P port] [-p proxyport] [-S [user[:password]@][version:]host:port] [-w url]')
 
 op.add_argument('-C', '--copyright', action='store_true', help='Print copyright and licensing information and exit.')
 op.add_argument('-H', '--host', metavar='NAME', help='Connect to MUD host by name', default='rag.com')
-op.add_argument('-h', '--help', action='store_true', help='Print help and usage information and exit.')
 op.add_argument('-l', '--local', action='store_true', help='Use built-in MUD interface instead of proxying for an external client.')
 op.add_argument('-P', '--port', metavar='PORT', help='Connect to MUD port', default='2222')
 op.add_argument('-p', '--proxy', metavar='PORT', help='External MUD client connectst to localhost port', default='2222')
+op.add_argument('-S', '--socks', metavar='PROXY', help='Specify SOCKS proxy parameters')
 op.add_argument('-V', '--version', action='store_true', help='Print program version number and exit.')
 op.add_argument('-v', '--verbose', action='count', default=0, help='Increase output verbosity.')
-op.add_argument('-w', '--web-base', metavar='URL', default=0, help='Increase output verbosity.')
+op.add_argument('-w', '--web-base', metavar='URL', help='Base URL for stored image content.')
 
 args = op.parse_args()
 
@@ -101,7 +103,7 @@ POSSIBILITY OF SUCH DAMAGE.""")
     sys.exit(0)
 
 print("""
-             Ragnarok Magic Map 6.1 Preview Tool (viewmap)
+             Ragnarok Magic Map 6.1 Client (magicmapper)
                   *** PRE-RELEASE PREVIEW VERSION ***
 
 Thank you for helping us test this program prior to releasing it as ready
@@ -113,39 +115,38 @@ Error messages about your map pages will show up here as well.  Eventually
 they will be put in a GUI window for you.
 """)
 
-"""
 icon = None
 
-class MapPreviewApp (tk.Tk):
-    def __init__(self, *args, **kwargs):
-        global icon
+class MagicMapperApp (tk.Tk):
+    def __init__(self, *a, **kwargs):
+        """Main application window for the magic mapper. Everything is launched
+        from here."""
+        tk.Tk.__init__(self, *a, **kwargs)
+        self.proxy = None
 
-        tk.Tk.__init__(self, *args, **kwargs)
-
-
-        w = MapPreviewFrame(master=self, title="Ragnarok Map Preview", config=config, prog_name="viewmap",
-            expand_globs = opt.expand_globs,
-            recursive = opt.recursive,
-            pattern = opt.pattern,
-            ignore_errors = opt.ignore_errors,
-            verbose = opt.verbose or 0,
-            file_list = cmd_map_file_list,
-            creator_name = opt.creator,
-            enforce_creator = bool(opt.enforce_boundaries),
-            image_dir = opt.image_dir,
+        w = MapClientFrame(master=self, title="Ragnarok Magic Mapper",
+            config=config, prog_name="magicmapper",
+            verbose = args.verbose,
+#            host=(args.host, args.port),
+#            local_mode=args.local,
+#            proxy_port=args.proxy,
+#            socks_proxy=args.socks,
+#            web_base=args.web_base,
             about_text = '''
-This application allows wizards to preview what their maps will look like by loading the raw "source" form of the map pages into this viewer.
+This client displays your location on the MUD game's magic map as you explore.
+            ''',
+            help_text = '''
+The official documentation for this program can be found online at the following URL:
 
-Run with the --help option for more details, or see the documentation online.  (Link below)''',
-            help_text = '''The official documentation for this program can be found
-online at the following URL:
+https://www.rag.com/tech/tools/magicmapper
 
-http://www.rag.com/tech/tools/viewmap
+A brief synopsis of magicmapper's usage may be displayed by running it with the --help option.
+            ''',
+        )
 
-A brief synopsis of viewmap's usage may be displayed by
-running it with the --help option.''')
         w.pack(fill=tk.BOTH, expand=True)
-        display_splash_screen(self, 'viewmaplogo.gif')
+        display_splash_screen(self, 'magicmapperlogo.gif')
+
 
         if sys.platform != 'win32':
             icon = tk.PhotoImage(file=os.path.join(config.image_path,'mapper.gif'))
@@ -157,6 +158,45 @@ running it with the --help option.''')
             except Exception:
                 pass
 
-Application = MapPreviewApp()
+        if args.local:
+            tk.messagebox.showerror(title="Not Implemented", 
+                message="The local MUD client feature has not yet been implemented.")
+            sys.exit(1)
+        else:
+            #
+            # set up proxy service for external MUD client
+            #
+            self.proxy = ProxyService(
+                remote_hostname=args.host,
+                remote_port=args.port,
+                local_hostname='localhost',
+                local_port=args.proxy,
+                event_queue = w.event_queue,
+            )
+            if args.socks:
+                #
+                # socks proxy string is [user[:password]@][version:]host:port
+                #
+                m = re.match(r'^(?:(.*?)(?::(.*))?@)?(?:(.*?):)?(.*):(.*)$', args.socks)
+                if m:
+                    socks_username = m.group(1)
+                    socks_password = m.group(2)
+                    socks_version = m.group(3) or '5'
+                    socks_host = m.group(4)
+                    socks_port = m.group(5)
+                    proxy.set_socks_proxy(socks_version, socks_host, socks_port, socks_username, socks_password)
+                else:
+                    op.error('Invalid --socks value')
+                    sys.exit(1)
+            self.proxy.run()
+            w.start_queue_runner()
+
+    def stop(self):
+        if self.proxy:
+            print("Stopping communication threads...")
+            self.proxy.stop()
+            print("Done.")
+
+Application = MagicMapperApp()
 Application.mainloop()
-"""
+Application.stop()
