@@ -1,10 +1,7 @@
-#
-# vi:set ai sm nu ts=4 sw=4 expandtab:
-#
 # RAGNAROK MAGIC MAPPER SOURCE CODE: Configuration Manager
 # $Header$
 #
-# Copyright (c) 2010 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2021 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.
