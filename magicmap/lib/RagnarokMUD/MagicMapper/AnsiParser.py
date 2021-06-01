@@ -398,7 +398,7 @@ class AnsiParser:
         if max is not None and len(parameters) > max:
             del parameters[max:]
 #
-# Copyright (c) 2012 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2012, 2021 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.

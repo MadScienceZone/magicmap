@@ -177,8 +177,10 @@ class DbMapCacheManager:
 
         self.db.commit()
 
-    def freshen_cache(self, age=7, progress=self.progress_meter):
+    def freshen_cache(self, age=7, progress=None):
         "Check for newer versions of map data that's older than <age> days, updating as necessary."
+        if progress is None:
+            progress = self.progress_meter
         mapdata = MapDataHandler()
         status_msg = 'Checking for newer map content... Updated {}'
         target_time = time.time() - (age * 86400)

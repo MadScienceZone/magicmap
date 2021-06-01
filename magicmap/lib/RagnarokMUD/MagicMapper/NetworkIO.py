@@ -872,7 +872,7 @@ class ProxyService (object):
 #            print("XXX unknown telnet protocol option setting {}.{}".format(command, option))
 
 
-# Copyright (c) 2010, 2015 by Steven L. Willoughby, Aloha, Oregon, USA.
+# Copyright (c) 2010, 2015, 2021 by Steven L. Willoughby, Aloha, Oregon, USA.
 # All Rights Reserved.  Licensed under the Open Software License
 # version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
 # for details.

@@ -33,7 +33,7 @@ import argparse
 import platform
 import queue
 import tkinter as tk
-from tkinter import ttk
+from   tkinter import ttk
 
 #@@REL@@sys.tracebacklimit=0
 
@@ -55,7 +55,7 @@ op.add_argument('-C', '--copyright', action='store_true', help='Print copyright 
 op.add_argument('-H', '--host', metavar='NAME', help='Connect to MUD host by name', default='rag.com')
 op.add_argument('-l', '--local', action='store_true', help='Use built-in MUD interface instead of proxying for an external client.')
 op.add_argument('-P', '--port', metavar='PORT', help='Connect to MUD port', default='2222')
-op.add_argument('-p', '--proxy', metavar='PORT', help='External MUD client connectst to localhost port', default='2222')
+op.add_argument('-p', '--proxy', metavar='PORT', help='External MUD client connects to localhost port', default='2222')
 op.add_argument('-S', '--socks', metavar='PROXY', help='Specify SOCKS proxy parameters')
 op.add_argument('-V', '--version', action='store_true', help='Print program version number and exit.')
 op.add_argument('-v', '--verbose', action='count', default=0, help='Increase output verbosity.')
@@ -69,7 +69,7 @@ if args.version:
 
 if args.copyright:
     print("""Ragnarök Magic Map 6.1 Map Viewer Proxy (magicmapper)
-Copyright © 2020 by Steven Willoughby, Aloha, Oregon, USA. All Rights Reserved.
+Copyright © 2020, 2021 by Steven Willoughby, Aloha, Oregon, USA. All Rights Reserved.
 Based on earlier code © 2003-2018 by Steven Willoughby and upon older code and
 ideas by Ron Lunde. 
 

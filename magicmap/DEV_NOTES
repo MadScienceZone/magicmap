@@ -3,3 +3,82 @@ Developer Notes:
 ==Building a Release==
 
 At the project root, do "make dist" to create a source distribution.
+
+
+==Classes==
+===AnsiParser===
+AnsiEvent(raw_bytes)
+ .raw_bytes
+  AnsiColor(raw_bytes, [ANSIcolornumber, ...])
+   .foreground
+   .background
+   .bold
+   .underlines
+   .reverse
+   .reset()
+   .apply(AnsiColorobject)	add other object's colors to us
+  AnsiCursor(raw_bytes, row=1, col=1)
+   .row
+   .col
+  AnsiClear(raw_bytes, mode=0)
+   .mode
+  AnsiClearEOL(raw_bytes, mode=0)
+   .mode
+  AnsiImage(raw_bytes, image_id)
+   .image_id
+  AnsiTrack(raw_bytes, state, name=None)
+   .state
+   .name
+  AnsiUpdateLocation(raw_bytes, i, n, modtime, checksum, location_id)
+   .i
+   .n
+   .modtime
+   .checksum
+   .location_id
+  AnsiCreateGauge(raw_bytes, gauge_id, value, maxvalue=None)
+   .gauge_id
+   .value
+   .maxvalue
+  AnsiDeleteGauge(raw_bytes, gauge_id)
+   .gauge_id
+  AnsiAuthChallenge(raw_bytes, challenge)
+   .challenge
+  AnsiCacheControl(raw_bytes, op)
+   .op
+
+AnsiParser(event_queue=None, client_queue=None, inline_images=True)
+ parse(string) -> to queues
+  event_queue <- text if there's no client_queue, events
+  client_queue <- text
+ 
+
+====NetworkIO====
+
+NetworkIO(base_url, cache_dir=None, cache_age=86400, diag_callback=None, config=None)
+ .log(msg, level=1, prog=None, total=None) -> diag_callback(level, prog, total, msg)
+ .get_page(pageno) -> data
+ .get_room(roomid) -> data
+  
+ProxyService(remote_hostname, report_port, local_hostname, local_port, event_queue, client_queue)
+ .set_socks_proxy(version, server, port, username, password)
+ .run()    starts communications, threads, etc
+ .stop()   shut down (blocks until threads finish)
+
+
+==Application Structure==
+ --copyright
+ --host name
+ --local
+ --port n
+ --proxy n
+ --socks p
+ --version
+ --verbose
+ --web-base url
+
+
+config=MagicMapper.ConfigurationManager
+MagicMapperApp(tk args)
+ MapClientFrame(config, args.verbose)
+ ProxyService if not --local
+ 
