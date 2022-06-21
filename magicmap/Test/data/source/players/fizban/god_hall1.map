@@ -1,6 +1,0 @@
-room: /players/fizban/egypt/god_hall1
-name: Hall of the (Ragnarok) Gods
-page: 25
-map: [240 330 220 330 220 290 170 290 170 390 220 390 220 350 240 350] mazeroom
-	txtf 175 360 mv (Hall of) show
-	175 350 mv (the Gods) show

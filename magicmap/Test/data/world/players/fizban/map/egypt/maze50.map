@@ -1,5 +1,0 @@
-room: /players/fizban/egypt/maze50
-name: Maze
-page: 25
-map: [390 590 380 590 380 570 390 570 390 580 400 580] dark mazeroom
-	385 575 1.5 dotmark

@@ -1,5 +1,0 @@
-room: /players/fizban/egypt/sphinx-II
-page: 24
-map:  [4 2] 0 sd np 410 230 mv 410 270 ln stroke [] 0 sd
-	  [370 285 390 285 390 270 430 270 430 310 390 310 390 295 370 295] 
-	  dark mazeroom

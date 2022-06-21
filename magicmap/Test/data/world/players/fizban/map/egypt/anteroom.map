@@ -1,7 +1,0 @@
-room: /players/fizban/egypt/anteroom
-name: maze anteroom
-page: 25
-map: [190 390 190 420 180 420 180 440 200 440 200 390] mazearea
-	[190 390 190 420 180 420 180 440 200 440 200 430] mazewall
-	[190 390 200 390 200 420] mazewall
-	txtf 192 392 mv (S) show

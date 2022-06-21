@@ -1,9 +1,0 @@
-room: /players/fizban/egypt/maze45
-name: Maze "Y"
-page: 25
-map: [350 520 380 520 380 510 400 510 390 500 390 
-	490 360 490 370 500 370 510 360 510] dark mazearea
-	[350 520 380 520 380 500 380 510 400 510] mazewall
-	[390 500 390 490 360 490] mazewall
-	[370 500 370 510 360 510] mazewall
-	txtf 372 492 mv (Y) show

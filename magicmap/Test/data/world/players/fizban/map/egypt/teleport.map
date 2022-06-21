@@ -1,5 +1,0 @@
-room: /players/fizban/egypt/teleport
-name: Teleport Chamber
-page: 25
-map: [480 490 500 475 480 460 480 490] mazeroom
-	482 472 mv txtf (S) show

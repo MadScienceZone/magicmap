@@ -1,8 +1,0 @@
-room: /players/fizban/egypt/maze25
-name: Maze
-page: 25
-map: [220 620 230 610 240 610 250 600 230 600 220 590 220 620] dark mazearea
-	[220 620 220 590] mazewall
-	[230 600 250 600] mazewall
-	[240 610 230 610] mazewall
-	225 605 1.5 dotmark

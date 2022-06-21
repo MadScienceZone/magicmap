@@ -1,8 +1,0 @@
-room:   /players/fizban/china/maze-II/26
-name:   Han Citadel, Maze Level II
-realm:  Aardvark's Museum: "Wonders of Ancient China"
-page: 173
-map:    [120 180 120 160 160 160 160 180] mazewall
-       [140 180 140 200 200 200 200 220] mazewall
-       [180 160 180 180 220 180 220 200] mazewall
-       170 190 2 dotmark

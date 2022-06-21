@@ -1,6 +1,0 @@
-room: /players/fizban/egypt/w_tomb
-name: West Tomb
-page: 24
-map:  [280 205 265 205 265 195 235 195 235 225 265 225 265 
-      215 280 215 280 205]
-      dark mazeroom txtf 273 207 mv (S) show

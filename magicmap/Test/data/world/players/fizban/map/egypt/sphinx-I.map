@@ -1,5 +1,0 @@
-room: /players/fizban/egypt/sphinx-I
-name: Sphinx Room
-page: 24
-map:  [375 205 390 205 390 190 430 190 430 230 390 230 390 215 375 215 375 
-      205] dark mazeroom txtf 377 207 mv (S) show

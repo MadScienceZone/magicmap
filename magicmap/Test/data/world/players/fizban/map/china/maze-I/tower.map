@@ -1,7 +1,0 @@
-room:   /players/fizban/china/maze-I/tower
-name:   Han Citadel, Tower
-realm:  Aardvark's Museum: "Wonders of Ancient China"
-page: 173
-map:    ()()480 540 60 outdoor round-room
-       14 it 420 605 mv (Han Tower) show
-       (Down to)(Maze)460 530 40 20 proto room

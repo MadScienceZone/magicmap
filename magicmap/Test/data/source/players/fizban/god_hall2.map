@@ -1,9 +1,0 @@
-room: /players/fizban/egypt/god_hall2
-name: Hall of the (Egyptian) Gods
-page: 25
-map: [390 330 410 330 410 290 430 290 430 270 440 270 440 290 460 290
-	460 390 410 390 410 350 390 350] mazeroom
-	txtf 415 360 mv (Hall of) show
-	415 350 mv (the Gods) show
-	np 425 280 mv 445 280 ln stroke
-	np 425 277 mv 445 277 ln stroke

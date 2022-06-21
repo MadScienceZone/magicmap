@@ -1,9 +1,0 @@
-room:   /players/fizban/china/chu/observatory
-name:   Outside Observatory
-realm:  Aardvark's Museum: "Wonders of Ancient China"
-page:   172
-map:    (Outside)(Observatory) 440 410 60 20 room
-		west passage
-		east passage
-		txtf 520 418 mv (To main level,) show
-	     520 408 mv (at \(9,1\), p. 171) show

@@ -1,7 +1,0 @@
-room: /players/fizban/egypt/rubble
-name: Bottom of Stairway
-page: 24
-map:  % XXX 20 165 250 fizbanEgyptStaircase 
-    170 250 3 dotmark 172 253 2 dotmark
-	167 254 2 dotmark 166 250 1 dotmark 172 255 2 dotmark
-	168 253 1.5 dotmark 172 250 2 dotmark

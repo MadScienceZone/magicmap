@@ -1,6 +1,0 @@
-room: /players/fizban/egypt/overlook1
-name: South Chasm View
-page: 24
-map:  170 375 15 dotmark
-      [165 360 169 365 169 385 165 390 175 390 171 385 171 365 175 360] dark 
-      mazearea

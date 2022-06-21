@@ -1,9 +1,0 @@
-room: /players/fizban/egypt/maze10
-name: Maze
-page: 25
-map:  [250 440 240 430 240 450 230 450 230 460 240 460 240 470 260 470
-	 250 460 250 440] dark mazearea
-	[250 440 250 460] mazewall
-	[260 460 260 470 240 470 240 460 230 
-	 460 230 450 240 450 240 430 250 430] mazewall
-	txtf 240 452 mv (Y2) show
