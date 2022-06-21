@@ -1,6 +1,6 @@
 # Magic Mapper 
 
-# Work in progress (not yet release)
+# Work in progress (not yet released)
 After being shelved for far too many years, we're creating this new
 version of the mapper client. Full notes will appear here when we
 release.
