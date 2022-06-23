@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# vi:set ai sm nu ts=4 sw=4 expandtab:
+# vi:set ai sm nu ts=4 sw=4 fileencoding=utf-8 expandtab:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: mapping proxy
 #
@@ -34,7 +34,7 @@ import platform
 import tkinter as tk
 from tkinter import ttk
 
-#@@REL@@sys.tracebacklimit=0
+@@REL@@sys.tracebacklimit=0
 
 #@@BEGIN-DEV:
 sys.path.append(os.path.join('..','lib'))

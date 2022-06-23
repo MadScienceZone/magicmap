@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# vi:set ai sm nu ts=4 sw=4 expandtab:
+# vi:set ai sm nu ts=4 sw=4 fileencoding=utf-8 expandtab:
 #
 # RAGNAROK MAGIC MAPPER SOURCE CODE: mapping client
 # On some systems, e.g., Microsoft Windows, we need to have a file 

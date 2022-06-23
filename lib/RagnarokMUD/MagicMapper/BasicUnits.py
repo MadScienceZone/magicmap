@@ -1,26 +1,24 @@
+########################################################################################
+#  _______  _______  _______ _________ _______  _______  _______  _______              #
+# (       )(  ___  )(  ____ \\__   __/(  ____ \(       )(  ___  )(  ____ ) Ragnarok    #
+# | () () || (   ) || (    \/   ) (   | (    \/| () () || (   ) || (    )| MUD         #
+# | || || || (___) || |         | |   | |      | || || || (___) || (____)| Magic       #
+# | |(_)| ||  ___  || | ____    | |   | |      | |(_)| ||  ___  ||  _____) Mapper      #
+# | |   | || (   ) || | \_  )   | |   | |      | |   | || (   ) || (       Client      #
+# | )   ( || )   ( || (___) |___) (___| (____/\| )   ( || )   ( || )       (rag.com)   #
+# |/     \||/     \|(_______)\_______/(_______/|/     \||/     \||/                    #
+#   ______    __       _______         _______  _        _______           _______     #
+#  / ____ \  /  \     (  __   )       (  ___  )( \      (  ____ )|\     /|(  ___  )    #
+# ( (    \/  \/) )    | (  )  |       | (   ) || (      | (    )|| )   ( || (   ) |    #
+# | (____      | |    | | /   | _____ | (___) || |      | (____)|| (___) || (___) |    #
+# |  ___ \     | |    | (/ /) |(_____)|  ___  || |      |  _____)|  ___  ||  ___  |    #
+# | (   ) )    | |    |   / | |       | (   ) || |      | (      | (   ) || (   ) |    #
+# ( (___) )_ __) (_ _ |  (__) |       | )   ( || (____/\| )      | )   ( || )   ( | _  #
+#  \_____/(_)\____/(_)(_______)       |/     \|(_______/|/       |/     \||/     \|(_) #
+#                                                                                      #
+########################################################################################
 #
-# vi:set ai sm nu ts=4 sw=4 expandtab:
-#
-# RAGNAROK MAGIC MAPPER SOURCE CODE: ANSI Sequence Parser
-# $Header$
-#
-# Copyright (c) 2012, 2018 by Steven L. Willoughby, Aloha, Oregon, USA.
-# All Rights Reserved.  Licensed under the Open Software License
-# version 3.0.  See http://www.opensource.org/licenses/osl-3.0.php
-# for details.
-#
-# This product is provided for educational, experimental or personal
-# interest use, in accordance with the terms and conditions of the
-# aforementioned license agreement, ON AN "AS IS" BASIS AND WITHOUT
-# WARRANTY, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION,
-# THE WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A
-# PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY OF THE ORIGINAL
-# WORK IS WITH YOU.  (See the license agreement for full details,
-# including disclaimer of warranty and limitation of liability.)
-#
-# Under no curcumstances is this product intended to be used where the
-# safety of any person, animal, or property depends upon, or is at
-# risk of any kind from, the correct operation of this software.
+# RAGNAROK MAGIC MAPPER SOURCE CODE: Basic Units used by the Mapper
 #
 
 class Point:
@@ -111,3 +109,44 @@ class DashPattern:
     def __init__(self, pattern, offset):
         self.pattern = pattern
         self.offset = offset
+
+#@[00]@| Ragnarok MagicMapper 6.1.0-alpha.0
+#@[01]@|
+#@[10]@| Copyright © 2010, 2018, 2020, 2021, 2022 by Steven L. Willoughby, Aloha, Oregon, USA.
+#@[11]@| All Rights Reserved. Licensed under the terms and conditions of the BSD-3-Clause
+#@[12]@| License as described in the accompanying LICENSE file distributed with MagicMapper.
+#@[13]@|
+#@[20]@| Based on earlier code from the Ragnarok MudShell (MSH) client,
+#@[21]@| Copyright © 1993, 2000-2003 by Steven L. Willoughby, Aloha, Oregon, USA.
+#@[22]@| MSH is licensed under the terms and conditions of the BSD-3-Clause
+#@[23]@|
+#@[30]@| Redistribution and use in source and binary forms, with or without
+#@[31]@| modification, are permitted provided that the following conditions
+#@[32]@| are met:
+#@[33]@| 1. Redistributions of source code must retain the above copyright
+#@[34]@|    notice, this list of conditions and the following disclaimer.
+#@[35]@| 2. Redistributions in binary form must reproduce the above copy-
+#@[36]@|    right notice, this list of conditions and the following dis-
+#@[37]@|    claimer in the documentation and/or other materials provided
+#@[38]@|    with the distribution.
+#@[39]@| 3. Neither the name of the copyright holder nor the names of its
+#@[40]@|    contributors may be used to endorse or promote products derived
+#@[41]@|    from this software without specific prior written permission.
+#@[42]@|
+#@[43]@| THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+#@[44]@| CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES,
+#@[45]@| INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#@[46]@| MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#@[47]@| DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+#@[48]@| BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+#@[49]@| OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#@[50]@| PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+#@[51]@| PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#@[52]@| THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+#@[53]@| TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+#@[54]@| THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+#@[55]@| SUCH DAMAGE.
+#@[56]@|
+#@[60]@| This software is not intended for any use or application in which
+#@[61]@| the safety of lives or property would be at risk due to failure or
+#@[62]@| defect of the software.
